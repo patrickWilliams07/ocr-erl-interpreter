@@ -1,0 +1,14 @@
+/*
+SYNTAX:
+<name> = nonterminal
+name = terminal
+::= = decleration
+| = OR
+{} = repeat 0 --> ∞ times
+(a|b) = make an option
+[+|-] = optional choice
+*/
+<expr> ::= <term>{(+|-)<term>}
+<term> ::= <factor>{(*|/)<factor>}
+<factor> ::= <exp>{^<exp>}
+<exp> ::= (<expr>)|id|literal
