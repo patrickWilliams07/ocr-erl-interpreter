@@ -1,3 +1,7 @@
+// Constants
+
+const DIGITS = [..."0123456789"]
+
 // Tokens
 
 class Token {
@@ -29,6 +33,18 @@ class Divide extends Token{
     }
 }
 
+class LeftBracket extends Token{
+    constructor(){
+        super()
+    }
+}
+
+class RightBracket extends Token{
+    constructor(){
+        super()
+    }
+}
+
 class Integer extends Token{
     constructor(value){
         super()
@@ -43,21 +59,34 @@ class Float extends Token{
     }
 }
 
-class LeftBracket extends Token{
-    constructor(){
-        super()
+// Errors
+class Error {
+    constructor(text, position){
+        this.text = text
+        this.position = position
+    }
+
+    display(){
+        let spaces = []
+        for (let i=0; i<this.position; i++){
+            spaces.push(' ')
+        }
+        return this.text + "\n" + spaces.join('') + '^'
     }
 }
 
-class RightBracket extends Token{
-    constructor(){
-        super()
+class UnexpectedCharacterError extends Error {
+    constructor(text, position, character) {
+        super(text, position)
+        this.character = character
+    }
+
+    message(){
+        return "Unexpected character: '" + this.character + "'\n" + this.display()
     }
 }
 
 // Lexer
-const DIGITS = [..."0123456789"]
-const LETTERS = [..."qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM_"]
 
 class Lexer {
     constructor(input){
@@ -81,6 +110,13 @@ class Lexer {
         while (this.character != null){
             if (this.character == ' '){
             } else if (DIGITS.includes(this.character)) {
+                number = this.make_number()
+                if (number.error != null){
+                    return {
+                        tokens: null,
+                        error: number.error
+                    }
+                }
                 tokens.push(this.make_number())
                 continue
             } else if (this.character == '+') {
@@ -95,10 +131,15 @@ class Lexer {
                 tokens.push(new LeftBracket())
             } else if (this.character == ')') {
                 tokens.push(new RightBracket())
+            } else {
+                return null, new UnexpectedCharacterError(input, this.position, this.character)
             }
             this.continue()
         }
-        return tokens
+        return {
+            tokens: tokens,
+            error: null
+        }
     }
 
     make_number(){
@@ -114,14 +155,17 @@ class Lexer {
         switch (fullStops){
             case 0:
                 return new Integer(Number(number.join('')))
+                return {
+                    tokens: tokens,
+                    error: null
+                }
             case 1:
                 return new Float(Number(number.join('')))
             default:
-                console.log("ERROR")
+                new UnexpectedCharacterError(thisinput, this.position, this.character)
         }
     }
-    
 }
 
-test = new Lexer("1+2*3-4 +5   -6 * 7.89 - 10")
-console.log(test.make_tokens())
+a = new Lexer("+-*/")
+console.log(a.make_tokens().tokens)
