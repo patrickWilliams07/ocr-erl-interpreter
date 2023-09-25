@@ -110,14 +110,11 @@ class Lexer {
         while (this.character != null){
             if (this.character == ' '){
             } else if (DIGITS.includes(this.character)) {
-                number = this.make_number()
-                if (number.error != null){
-                    return {
-                        tokens: null,
-                        error: number.error
-                    }
+                let number = this.make_number()
+                if (number instanceof Error) {
+                    return number
                 }
-                tokens.push(this.make_number())
+                tokens.push(number)
                 continue
             } else if (this.character == '+') {
                 tokens.push(new Add())
@@ -132,40 +129,50 @@ class Lexer {
             } else if (this.character == ')') {
                 tokens.push(new RightBracket())
             } else {
-                return null, new UnexpectedCharacterError(input, this.position, this.character)
+                return new UnexpectedCharacterError(this.input, this.position, this.character)
             }
             this.continue()
         }
-        return {
-            tokens: tokens,
-            error: null
-        }
+        return tokens
     }
 
     make_number(){
         let number = []
         let fullStops = 0
-        while ((DIGITS.includes(this.character) || this.character == '.') && fullStops <= 1){
+        while (DIGITS.includes(this.character) || this.character == '.'){
             number.push(this.character)
             if (this.character == '.'){
                 fullStops += 1
+                if (fullStops == 2){
+                    return new UnexpectedCharacterError(this.input, this.position, '.')
+                }
             }
             this.continue()
         }
-        switch (fullStops){
-            case 0:
-                return new Integer(Number(number.join('')))
-                return {
-                    tokens: tokens,
-                    error: null
-                }
-            case 1:
-                return new Float(Number(number.join('')))
-            default:
-                new UnexpectedCharacterError(thisinput, this.position, this.character)
+        if (fullStops == 0){
+            return new Integer(Number(number.join('')))
+        }
+        return new Float(Number(number.join('')))
+    }
+}
+
+class Shell {
+    construcor {
+
+    }
+
+    get_input() {
+        
+    }
+
+    run(input){
+        let tokens = new Lexer(input).make_tokens()
+        if (tokens instanceof Error){
+            console.log(tokens.message())
+        } else {
+            console.log(tokens)
         }
     }
 }
 
-a = new Lexer("+-*/")
-console.log(a.make_tokens().tokens)
+new Run("2+2+78+2346.6-346.963.323 + 4")
