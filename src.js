@@ -1,5 +1,5 @@
 // Constants
-
+const prompt = require('prompt-sync')()
 const DIGITS = [..."0123456789"]
 
 // Tokens
@@ -67,11 +67,7 @@ class Error {
     }
 
     display(){
-        let spaces = []
-        for (let i=0; i<this.position; i++){
-            spaces.push(' ')
-        }
-        return this.text + "\n" + spaces.join('') + '^'
+        return `${this.text}\n${' '.repeat(this.position)}^`
     }
 }
 
@@ -82,7 +78,7 @@ class UnexpectedCharacterError extends Error {
     }
 
     message(){
-        return "Unexpected character: '" + this.character + "'\n" + this.display()
+        return ` ! ERROR\nUnexpected Character: '${this.character}'\n${this.display()}`
     }
 }
 
@@ -98,11 +94,7 @@ class Lexer {
 
     continue(){
         this.position += 1
-        if (this.position == this.input.length){
-            this.character = null
-        } else {
-            this.character = this.input[this.position]
-        }
+        this.character = this.position == this.input.length ? null : this.input[this.position]
     }
 
     make_tokens(){
@@ -149,30 +141,27 @@ class Lexer {
             }
             this.continue()
         }
-        if (fullStops == 0){
-            return new Integer(Number(number.join('')))
-        }
-        return new Float(Number(number.join('')))
+        return fullStops == 0 ? new Integer(Number(number.join(''))) : new Float(Number(number.join('')))
     }
 }
 
 class Shell {
-    construcor {
-
+    constructor() {
+        this.main()
     }
 
-    get_input() {
-        
+    main(){
+        let input = prompt(" ERL ==> ")
+        while (input != "QUIT()"){
+            this.run(input)
+            input = prompt(" ERL ==> ")
+        }
     }
 
     run(input){
         let tokens = new Lexer(input).make_tokens()
-        if (tokens instanceof Error){
-            console.log(tokens.message())
-        } else {
-            console.log(tokens)
-        }
+        console.log(tokens instanceof Error ? tokens.message() : tokens)
     }
 }
 
-new Run("2+2+78+2346.6-346.963.323 + 4")
+new Shell()
