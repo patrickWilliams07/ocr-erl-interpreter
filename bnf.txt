@@ -10,5 +10,5 @@ name = terminal
 */
 <expr> ::= <term>{(+|-)<term>}
 <term> ::= <factor>{(*|/)<factor>}
-<factor> ::= <exp>{^<exp>}
-<exp> ::= (<expr>)|id|literal
+<power> ::= <exp>{^<exp>}
+<factor> ::= (<expr>)|id|literal

@@ -9,25 +9,31 @@ class Token {
     }
 }
 
-class Add extends Token{
+class BinaryOperator extends Token{
     constructor(){
         super()
     }
 }
 
-class Minus extends Token{
+class Add extends BinaryOperator{
     constructor(){
         super()
     }
 }
 
-class Multiply extends Token{
+class Minus extends BinaryOperator{
     constructor(){
         super()
     }
 }
 
-class Divide extends Token{
+class Multiply extends BinaryOperator{
+    constructor(){
+        super()
+    }
+}
+
+class Divide extends BinaryOperator{
     constructor(){
         super()
     }
@@ -145,6 +151,37 @@ class Lexer {
     }
 }
 
+class Parser {
+    constructor(tokens){
+        this.tokens = tokens
+        this.position = -1
+        this.token = null
+        this.continue()
+    }
+
+    continue(){
+        this.position += 1
+        this.token = this.position == this.tokens.length ? null : this.tokens[this.position]
+    }
+
+    factor(){
+
+    }
+
+    power(){
+
+    }
+
+    term(){
+        
+    }
+
+    expression(){
+
+    }
+}
+
+
 class Shell {
     constructor() {
         this.main()
@@ -164,4 +201,8 @@ class Shell {
     }
 }
 
-new Shell()
+test = new Parser(new Lexer("2 + 3 * 4.5 - 7").make_tokens())
+while (test.token != null){
+    console.log(test.token)
+    test.continue()
+}
