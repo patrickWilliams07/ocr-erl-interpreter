@@ -18,6 +18,16 @@ class BinaryOperator extends Token{
         this.left = null
         this.right = null
     }
+
+    check_for_errors(left, right){
+        if (left instanceof Error){
+            return left
+        }
+        if (right instanceof Error){
+            return right
+        }
+        return null
+    }
 }
 
 class Add extends BinaryOperator{
@@ -27,14 +37,9 @@ class Add extends BinaryOperator{
     
     evaluate(){
         let left = this.left.evaluate()
-        if (left instanceof Error){
-            return left
-        }
         let right = this.right.evaluate()
-        if (right instanceof Error){
-            return right
-        }
-        return left + right
+        let result = this.check_for_errors(left, right)
+        return result == null ? left + right : result
     }
 }
 
@@ -45,14 +50,9 @@ class Minus extends BinaryOperator{
     
     evaluate(){
         let left = this.left.evaluate()
-        if (left instanceof Error){
-            return left
-        }
         let right = this.right.evaluate()
-        if (right instanceof Error){
-            return right
-        }
-        return left - right
+        let result = this.check_for_errors(left, right)
+        return result == null ? left - right : result
     }
 }
 
@@ -63,14 +63,9 @@ class Multiply extends BinaryOperator{
     
     evaluate(){
         let left = this.left.evaluate()
-        if (left instanceof Error){
-            return left
-        }
         let right = this.right.evaluate()
-        if (right instanceof Error){
-            return right
-        }
-        return left * right
+        let result = this.check_for_errors(left, right)
+        return result == null ? left * right : result
     }
 }
 
@@ -81,15 +76,13 @@ class Divide extends BinaryOperator{
     
     evaluate(){
         let left = this.left.evaluate()
-        if (left instanceof Error){
-            return left
-        }
         let right = this.right.evaluate()
-        if (right instanceof Error){
-            return right
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
         }
         if (right == 0){
-            return new MathError(this)
+            return new MathError(this, "Cannot divide by 0")
         }
         return left / right
     }
@@ -102,15 +95,13 @@ class Exponent extends BinaryOperator{
     
     evaluate(){
         let left = this.left.evaluate()
-        if (left instanceof Error){
-            return left
-        }
         let right = this.right.evaluate()
-        if (right instanceof Error){
-            return right
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
         }
         if (isNaN(left ** right)){
-            return new MathError(this)
+            return new MathError(this, "Cannot raise a negative number to this power")
         }
         return left ** right
     }
@@ -174,44 +165,26 @@ class UnexpectedCharacterError extends Error {
 }
 
 class SyntaxError extends Error {
-    constructor(token) {
-        if (token instanceof Token){
-            super(token.position)
-            this.token = token
-        } else {
-            super(token)
-            this.token = null
-        }
+    constructor(token, description='') {
+        super(token.position)
+        this.token = token
+        this.description = description
     }
 
     message(){
-        if (this.token instanceof LeftBracket) {
-            return ` ! ERROR\nInvalid Syntax: '(' was never closed\n${this.display()}`
-        } else if (this.token instanceof BinaryOperator) {
-            // Or identifier in the future
-            return ` ! ERROR\nInvalid Syntax: Expected literal\n${this.display()}`
-        } else if (this.token instanceof Integer || this.token instanceof Float) {
-            return ` ! ERROR\nInvalid Syntax: Expected operator\n${this.display()}`
-        } else if (this.token == null){
-            return ` ! ERROR\nInvalid Syntax: Incomplete input\n${this.display()}`
-        }
-        return ` ! ERROR\nInvalid Syntax\n${this.display()}`
+        return ` ! ERROR\nInvalid Syntax: ${this.description}\n${this.display()}`
     }
 }
 
 class MathError extends Error {
-    constructor(token) {
+    constructor(token, description='') {
         super(token.position)
         this.token = token
+        this.description = description
     }
 
     message(){
-        if (this.token instanceof Divide){
-            return ` ! ERROR\nMath Error: Cannot divide by 0\n${this.display()}`
-        } else if (this.token instanceof Exponent){
-            return ` ! ERROR\nMath Error: Cannot raise negative numbers to this power\n${this.display()}`
-        }
-        return ` ! ERROR\nMath Error\n${this.display()}`
+        return ` ! ERROR\nMath Error: ${this.description}\n${this.display()}`
     }
 }
 
@@ -306,10 +279,13 @@ class Parser {
 
     parse(){
         let result = this.expression(this)
+        if (result instanceof Error){
+            return result
+        }
         if (this.token == null){
             return result
         }
-        return new SyntaxError(this.token)
+        return new SyntaxError(this.token, "Expected operator")
     }
 
     factor(self){
@@ -325,23 +301,31 @@ class Parser {
                 self.continue()
                 return result
             }
-            return new SyntaxError(errorToken)
+            return new SyntaxError(errorToken,  "'(' was never closed")
         } else if (self.check_instance([Add])){
-    
+            let errorToken = self.token
             self.continue()
+            if (self.token == null){
+                return new SyntaxError(errorToken.position, "Incomplete input")
+            }
             return self.factor(self)
         } else if (self.check_instance([Minus])){
-            let result = new Minus(self.position)
-            result.left = new Integer(self.position, 0)
+            let errorToken = self.token
             self.continue()
+            if (self.token == null){
+                return new SyntaxError(errorToken, "Incomplete input")
+            }
             let right = self.factor(self)
             if (right instanceof Error){
                 return right
             }
+            let result = new Minus(self.position)
+            result.left = new Integer(self.position, 0)
             result.right = right
             return result
         }
-        return new SyntaxError(self.token)
+        console.log('E')
+        return new SyntaxError(self.token, "Expected literal")
     }
 
     exponent(self){
@@ -369,7 +353,7 @@ class Parser {
             result = self.token
             self.continue()
             if (self.token == null){
-                return new SyntaxError(self.position)
+                return new SyntaxError(result, "Incomplete Input")
             }
             result.right = nextFunction(self)
             if (result.right instanceof Error){
