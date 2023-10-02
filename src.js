@@ -1,8 +1,10 @@
-// Constants
+// Global
 const prompt = require('prompt-sync')()
 const DIGITS = [..."0123456789"]
+let currentText = ""
 
 // Tokens
+
 
 class Token {
     constructor(position){
@@ -24,7 +26,15 @@ class Add extends BinaryOperator{
     }
     
     evaluate(){
-        return this.left.evaluate() + this.right.evaluate()
+        let left = this.left.evaluate()
+        if (left instanceof Error){
+            return left
+        }
+        let right = this.right.evaluate()
+        if (right instanceof Error){
+            return right
+        }
+        return left + right
     }
 }
 
@@ -34,7 +44,15 @@ class Minus extends BinaryOperator{
     }
     
     evaluate(){
-        return this.left.evaluate() - this.right.evaluate()
+        let left = this.left.evaluate()
+        if (left instanceof Error){
+            return left
+        }
+        let right = this.right.evaluate()
+        if (right instanceof Error){
+            return right
+        }
+        return left - right
     }
 }
 
@@ -44,7 +62,15 @@ class Multiply extends BinaryOperator{
     }
     
     evaluate(){
-        return this.left.evaluate() * this.right.evaluate()
+        let left = this.left.evaluate()
+        if (left instanceof Error){
+            return left
+        }
+        let right = this.right.evaluate()
+        if (right instanceof Error){
+            return right
+        }
+        return left * right
     }
 }
 
@@ -54,7 +80,18 @@ class Divide extends BinaryOperator{
     }
     
     evaluate(){
-        return this.left.evaluate() / this.right.evaluate()
+        let left = this.left.evaluate()
+        if (left instanceof Error){
+            return left
+        }
+        let right = this.right.evaluate()
+        if (right instanceof Error){
+            return right
+        }
+        if (right == 0){
+            return new MathError(this)
+        }
+        return left / right
     }
 }
 
@@ -64,7 +101,18 @@ class Exponent extends BinaryOperator{
     }
     
     evaluate(){
-        return this.left.evaluate() ** this.right.evaluate()
+        let left = this.left.evaluate()
+        if (left instanceof Error){
+            return left
+        }
+        let right = this.right.evaluate()
+        if (right instanceof Error){
+            return right
+        }
+        if (isNaN(left ** right)){
+            return new MathError(this)
+        }
+        return left ** right
     }
 }
 
@@ -104,8 +152,8 @@ class Float extends Token{
 
 // Errors
 class Error {
-    constructor(text, position){
-        this.text = text
+    constructor(position){
+        this.text = currentText
         this.position = position
     }
 
@@ -115,8 +163,8 @@ class Error {
 }
 
 class UnexpectedCharacterError extends Error {
-    constructor(text, position, character) {
-        super(text, position)
+    constructor(position, character) {
+        super(position)
         this.character = character
     }
 
@@ -126,9 +174,14 @@ class UnexpectedCharacterError extends Error {
 }
 
 class SyntaxError extends Error {
-    constructor(text, token) {
-        super(text, token.position)
-        this.token = token
+    constructor(token) {
+        if (token instanceof Token){
+            super(token.position)
+            this.token = token
+        } else {
+            super(token)
+            this.token = null
+        }
     }
 
     message(){
@@ -137,11 +190,28 @@ class SyntaxError extends Error {
         } else if (this.token instanceof BinaryOperator) {
             // Or identifier in the future
             return ` ! ERROR\nInvalid Syntax: Expected literal\n${this.display()}`
-        }   else if (this.token instanceof Integer || this.token instanceof Float) {
-
+        } else if (this.token instanceof Integer || this.token instanceof Float) {
             return ` ! ERROR\nInvalid Syntax: Expected operator\n${this.display()}`
+        } else if (this.token == null){
+            return ` ! ERROR\nInvalid Syntax: Incomplete input\n${this.display()}`
         }
         return ` ! ERROR\nInvalid Syntax\n${this.display()}`
+    }
+}
+
+class MathError extends Error {
+    constructor(token) {
+        super(token.position)
+        this.token = token
+    }
+
+    message(){
+        if (this.token instanceof Divide){
+            return ` ! ERROR\nMath Error: Cannot divide by 0\n${this.display()}`
+        } else if (this.token instanceof Exponent){
+            return ` ! ERROR\nMath Error: Cannot raise negative numbers to this power\n${this.display()}`
+        }
+        return ` ! ERROR\nMath Error\n${this.display()}`
     }
 }
 
@@ -186,7 +256,7 @@ class Lexer {
             } else if (this.character == ')') {
                 tokens.push(new RightBracket(this.position))
             } else {
-                return new UnexpectedCharacterError(this.input, this.position, this.character)
+                return new UnexpectedCharacterError(this.position, this.character)
             }
             this.continue()
         }
@@ -202,7 +272,7 @@ class Lexer {
             if (this.character == '.'){
                 fullStops += 1
                 if (fullStops == 2){
-                    return new UnexpectedCharacterError(this.input, this.position, '.')
+                    return new UnexpectedCharacterError(this.position, '.')
                 }
             }
             this.continue()
@@ -212,9 +282,8 @@ class Lexer {
 }
 
 class Parser {
-    constructor(tokens, text){
+    constructor(tokens){
         this.tokens = tokens
-        this.text = text
         this.position = -1
         this.token = null
         this.continue()
@@ -240,7 +309,7 @@ class Parser {
         if (this.token == null){
             return result
         }
-        return new SyntaxError(this.text, this.token)
+        return new SyntaxError(this.token)
     }
 
     factor(self){
@@ -256,9 +325,23 @@ class Parser {
                 self.continue()
                 return result
             }
-            return new SyntaxError(self.text, errorToken)
+            return new SyntaxError(errorToken)
+        } else if (self.check_instance([Add])){
+    
+            self.continue()
+            return self.factor(self)
+        } else if (self.check_instance([Minus])){
+            let result = new Minus(self.position)
+            result.left = new Integer(self.position, 0)
+            self.continue()
+            let right = self.factor(self)
+            if (right instanceof Error){
+                return right
+            }
+            result.right = right
+            return result
         }
-        return new SyntaxError(self.text, self.token)
+        return new SyntaxError(self.token)
     }
 
     exponent(self){
@@ -285,6 +368,9 @@ class Parser {
             self.token.left = result
             result = self.token
             self.continue()
+            if (self.token == null){
+                return new SyntaxError(self.position)
+            }
             result.right = nextFunction(self)
             if (result.right instanceof Error){
                 return result.right
@@ -309,13 +395,19 @@ class Shell {
     }
 
     run(input){
+        currentText = input
         let tokens = new Lexer(input).make_tokens()
         if (tokens instanceof Error){
             console.log(tokens.message())
             return
         }
-        let parsed = new Parser(tokens, input).parse()
-        console.log(parsed instanceof Error ? parsed.message() : parsed.evaluate())
+        let parsed = new Parser(tokens).parse()
+        if (parsed instanceof Error){
+            console.log(parsed.message())
+            return
+        }
+        let evaluated = parsed.evaluate()
+        console.log(evaluated instanceof Error ? evaluated.message() : evaluated)
     }
 }
 
