@@ -1,10 +1,7 @@
-// Global
+// Global usage
 const prompt = require('prompt-sync')()
 const DIGITS = [..."0123456789"]
 let currentText = ""
-
-// Tokens
-
 
 class Token {
     constructor(position){
@@ -19,6 +16,7 @@ class BinaryOperator extends Token{
         this.right = null
     }
 
+    // Ensure that if an error has been returned it is not involved in a calculation
     check_for_errors(left, right){
         if (left instanceof Error){
             return left
@@ -100,7 +98,7 @@ class Exponent extends BinaryOperator{
         if (result != null){
             return result
         }
-        if (isNaN(left ** right)){
+        if (isNaN(left ** right)){ // No imaginary numbers
             return new MathError(this, "Cannot raise a negative number to this power")
         }
         return left ** right
@@ -141,7 +139,6 @@ class Float extends Token{
     }
 }
 
-// Errors
 class Error {
     constructor(position){
         this.text = currentText
@@ -188,8 +185,6 @@ class MathError extends Error {
     }
 }
 
-// Lexer
-
 class Lexer {
     constructor(input){
         this.input = input
@@ -228,7 +223,7 @@ class Lexer {
                 tokens.push(new LeftBracket(this.position))
             } else if (this.character == ')') {
                 tokens.push(new RightBracket(this.position))
-            } else {
+            } else { // Not recognised
                 return new UnexpectedCharacterError(this.position, this.character)
             }
             this.continue()
@@ -267,7 +262,7 @@ class Parser {
         this.token = this.position == this.tokens.length ? null : this.tokens[this.position]
     }
 
-
+    // Takes in an array and checks if current token is instance of the items
     check_instance(check) {
         for (let item of check){
             if (this.token instanceof item){
@@ -284,7 +279,7 @@ class Parser {
         }
         if (this.token == null){
             return result
-        }
+        } // Two literals in a row
         return new SyntaxError(this.token, "Expected operator")
     }
 
@@ -302,14 +297,14 @@ class Parser {
                 return result
             }
             return new SyntaxError(errorToken,  "'(' was never closed")
-        } else if (self.check_instance([Add])){
+        } else if (self.check_instance([Add])){ // Add unary operator
             let errorToken = self.token
             self.continue()
             if (self.token == null){
                 return new SyntaxError(errorToken.position, "Incomplete input")
             }
             return self.factor(self)
-        } else if (self.check_instance([Minus])){
+        } else if (self.check_instance([Minus])){ // Minus unary operator
             let errorToken = self.token
             self.continue()
             if (self.token == null){
@@ -319,12 +314,11 @@ class Parser {
             if (right instanceof Error){
                 return right
             }
-            let result = new Minus(self.position)
+            let result = new Minus(self.position) // Just adds minus node of 0 - value
             result.left = new Integer(self.position, 0)
             result.right = right
             return result
-        }
-        console.log('E')
+        } // Two operators in a row
         return new SyntaxError(self.token, "Expected literal")
     }
 
@@ -370,7 +364,7 @@ class Shell {
         this.main()
     }
 
-    main(){
+    main(){ // Can only be run in terminal as inputs don't work in VScode
         let input = prompt(" ERL ==> ")
         while (input != "QUIT()"){
             this.run(input)
