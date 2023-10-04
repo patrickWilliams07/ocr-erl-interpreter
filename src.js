@@ -1,12 +1,49 @@
+class SymbolTable {
+    constructor(){
+        this.table = []
+    }
+
+    find(name){
+        for (let item of this.table){
+            if (item.name == name){
+                return item
+            }
+        }
+        this.table.push(new DataType(name))
+        return this.table[this.table.length - 1]
+    }
+}
+
+class DataType {
+    constructor(name){
+        this.name = name
+        this._value = null
+    }
+
+    get value(){
+        if (this._value == null){
+            console.log("Error")
+            return
+        }
+        return this._value
+    }
+
+    set value(newValue){
+        this._value = newValue
+    }
+}
+
 // Global usage
 const prompt = require('prompt-sync')()
 const DIGITS = [..."0123456789"]
+const LETTERS = [..."qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"]
+let global = new SymbolTable()
 let currentText = ""
 
 class Token {
     constructor(position){
         this.position = position
-    }
+    } 
 }
 
 class BinaryOperator extends Token{
@@ -105,6 +142,23 @@ class Exponent extends BinaryOperator{
     }
 }
 
+class Equals extends BinaryOperator{
+    constructor(position){
+        super(position)
+    }
+
+    evaluate(){
+        let left = this.left.assign()
+        let right = this.right.evaluate()
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
+        }
+        left.value = right
+        return null
+    }
+}
+
 class LeftBracket extends Token{
     constructor(position){
         super(position)
@@ -136,6 +190,21 @@ class Float extends Token{
     
     evaluate(){
         return this.value
+    }
+}
+
+class Identifier extends Token{
+    constructor(position, name){
+        super(position)
+        this.name = name
+    }
+
+    evaluate(){
+        return global.find(this.name).value
+    }
+
+    assign(){
+        return global.find(this.name)
     }
 }
 
@@ -209,6 +278,9 @@ class Lexer {
                 }
                 tokens.push(number)
                 continue
+            } else if (LETTERS.includes(this.character)){
+                tokens.push(this.make_identifier())
+                continue
             } else if (this.character == '+') {
                 tokens.push(new Add(this.position))
             } else if (this.character == '-') {
@@ -219,6 +291,8 @@ class Lexer {
                 tokens.push(new Divide(this.position))
             } else if (this.character == '^') {
                 tokens.push(new Exponent(this.position))
+            } else if (this.character == '=') {
+                tokens.push(new Equals(this.position))
             } else if (this.character == '(') {
                 tokens.push(new LeftBracket(this.position))
             } else if (this.character == ')') {
@@ -247,10 +321,20 @@ class Lexer {
         }
         return fullStops == 0 ? new Integer(position, Number(number.join(''))) : new Float(position, Number(number.join('')))
     }
+
+    make_identifier(){
+        let name = []
+        let position = this.position
+        while (LETTERS.includes(this.character) || DIGITS.includes(this.character)){
+            name.push(this.character)
+            this.continue()
+        }
+        return new Identifier(position, name.join(''))
+    }
 }
 
 class Parser {
-    constructor(tokens){
+    constructor(tokens){    
         this.tokens = tokens
         this.position = -1
         this.token = null
@@ -260,6 +344,11 @@ class Parser {
     continue(){
         this.position += 1
         this.token = this.position == this.tokens.length ? null : this.tokens[this.position]
+    }
+
+    reset(){
+        this.position = -1
+        this.continue()
     }
 
     // Takes in an array and checks if current token is instance of the items
@@ -273,7 +362,7 @@ class Parser {
     }
 
     parse(){
-        let result = this.expression(this)
+        let result = this.assignment(this)
         if (result instanceof Error){
             return result
         }
@@ -284,7 +373,7 @@ class Parser {
     }
 
     factor(self){
-        if (self.check_instance([Integer, Float])){
+        if (self.check_instance([Integer, Float, Identifier])){
             let result = self.token
             self.continue()
             return result
@@ -332,6 +421,27 @@ class Parser {
 
     expression(self){
         return self.parse_binary_operator(self, self.term, [Add, Minus])
+    }
+
+    assignment(self){
+        if (!(self.token instanceof Identifier)){
+            return self.expression(self)
+        }
+        let left = self.token
+        self.continue()
+        if (!(self.token instanceof Equals)){
+            self.reset()
+            return self.expression(self)
+        }
+        let result = self.token
+        self.continue()
+        let right = self.expression(self)
+        if (right instanceof Error){
+            return right
+        }
+        result.left = left
+        result.right = right
+        return result
     }
 
     // First parameter = References the instance of the parser
@@ -385,8 +495,22 @@ class Shell {
             return
         }
         let evaluated = parsed.evaluate()
-        console.log(evaluated instanceof Error ? evaluated.message() : evaluated)
+        if (evaluated instanceof Error){
+            console.log(evaluated.message())
+            return
+        }
+        if (evaluated != null){
+            console.log(evaluated)
+        }
+        return
     }
 }
 
 new Shell()
+// let variable = new Identifier(0, "name")
+// let number = new Integer(3, 5)
+// let equals = new Equals(1)
+// equals.left = variable
+// equals.right = number
+// equals.evaluate()
+// console.log(global.find("name"))
