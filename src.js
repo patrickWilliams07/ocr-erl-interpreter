@@ -3,33 +3,51 @@ class SymbolTable {
         this.table = []
     }
 
-    find(name){
+    find(token){
         for (let item of this.table){
-            if (item.name == name){
+            if (item.name == token.name){
+                item.lastReferenced = token
                 return item
             }
         }
-        this.table.push(new DataType(name))
+        this.table.push(new DataType(token))
         return this.table[this.table.length - 1]
     }
 }
 
 class DataType {
-    constructor(name){
-        this.name = name
+    constructor(token){
+        this.name = token.name
         this._value = null
+        this.lastReferenced = token
+        this.constant = token.constant
+        if (this.constant){
+            this.declared = false
+        }
     }
 
     get value(){
         if (this._value == null){
-            console.log("Error")
-            return
+            return new IdentifierError(this.lastReferenced, "was not declared")
         }
         return this._value
     }
 
-    set value(newValue){
+    set(newValue){
+        if (this.lastReferenced.constant == true){
+            this.constant = true
+            this.declared = false
+        }
+        if (!(this.constant)){
+            this._value = newValue
+            return null
+        }
+        if (this.declared){
+            return new IdentifierError(this.lastReferenced, "is a constant and has already been defined")
+        }
+        this.declared = true
         this._value = newValue
+        return null
     }
 }
 
@@ -154,8 +172,7 @@ class Equals extends BinaryOperator{
         if (result != null){
             return result
         }
-        left.value = right
-        return null
+        return left.set(right)
     }
 }
 
@@ -194,19 +211,35 @@ class Float extends Token{
 }
 
 class Identifier extends Token{
-    constructor(position, name){
+    constructor(position, name, constant=false){
         super(position)
         this.name = name
+        this.constant = constant
     }
 
     evaluate(){
-        return global.find(this.name).value
+        return global.find(this).value
     }
 
     assign(){
-        return global.find(this.name)
+        return global.find(this)
     }
 }
+
+class Keyword extends Token{
+    constructor(position){
+        super(position)
+    }
+}
+
+// For generic keywords like const, global which don't need a unique object object
+class TemplateKeyword extends Keyword{
+    constructor(position, tag){
+        super(position)
+        this.tag = tag
+    }
+}
+
 
 class Error {
     constructor(position){
@@ -251,6 +284,18 @@ class MathError extends Error {
 
     message(){
         return ` ! ERROR\nMath Error: ${this.description}\n${this.display()}`
+    }
+}
+
+class IdentifierError extends Error{
+    constructor(token, description='') {
+        super(token.position)
+        this.token = token
+        this.description = description
+    }
+
+    message(){
+        return ` ! ERROR\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.display()}`
     }
 }
 
@@ -329,7 +374,13 @@ class Lexer {
             name.push(this.character)
             this.continue()
         }
-        return new Identifier(position, name.join(''))
+        name = name.join('')
+        switch (name) {
+            case "const":
+                return new TemplateKeyword(position, "const")
+            default:
+                return new Identifier(position, name)
+        }
     }
 }
 
@@ -362,14 +413,35 @@ class Parser {
     }
 
     parse(){
-        let result = this.assignment(this)
-        if (result instanceof Error){
-            return result
-        }
+        // Check if there are no tokens
         if (this.token == null){
-            return result
-        } // Two literals in a row
-        return new SyntaxError(this.token, "Expected operator")
+            return null
+        }
+        // Check if there is a tagged assignment
+        if (this.token instanceof TemplateKeyword){
+            let result = this.assignment(this, this.token.tag)
+            return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+        }
+        // Check if it is a normal assignment
+        if (this.token instanceof Identifier){
+            this.continue()
+            let token = this.token
+            this.reset()
+            if (token instanceof Equals){
+                let result = this.assignment(this)
+                return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+            }
+        }
+        // Left over case is just an expression
+        let result = this.expression(this)
+        return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+    }
+
+    check_result(result){
+        if (result instanceof Error || this.token == null){
+            return true
+        }
+        return false
     }
 
     factor(self){
@@ -423,18 +495,29 @@ class Parser {
         return self.parse_binary_operator(self, self.term, [Add, Minus])
     }
 
-    assignment(self){
-        if (!(self.token instanceof Identifier)){
-            return self.expression(self)
+    assignment(self, tag=null){
+        let errorToken
+        if (tag != null){
+            errorToken = this.token
+            self.continue()
         }
         let left = self.token
-        self.continue()
-        if (!(self.token instanceof Equals)){
-            self.reset()
-            return self.expression(self)
+        if (left == null){
+            return new SyntaxError(errorToken, `epected identifier after '${errorToken.tag}'`)
         }
-        let result = self.token
+        if (tag == "const"){
+            left = new Identifier(left.position, left.name, true)
+        }
         self.continue()
+        let result = self.token
+        if (!(result instanceof Equals)){
+            return new SyntaxError(result, "expected '='")
+        }
+        errorToken = self.token
+        self.continue()
+        if (self.token == null){
+            return new SyntaxError(errorToken, "Incomplete input")
+        }
         let right = self.expression(self)
         if (right instanceof Error){
             return right
@@ -443,6 +526,7 @@ class Parser {
         result.right = right
         return result
     }
+
 
     // First parameter = References the instance of the parser
     // Second parameter = Method to call that is beneath the current one
@@ -494,6 +578,9 @@ class Shell {
             console.log(parsed.message())
             return
         }
+        if (parsed == null){
+            return
+        }
         let evaluated = parsed.evaluate()
         if (evaluated instanceof Error){
             console.log(evaluated.message())
@@ -507,10 +594,3 @@ class Shell {
 }
 
 new Shell()
-// let variable = new Identifier(0, "name")
-// let number = new Integer(3, 5)
-// let equals = new Equals(1)
-// equals.left = variable
-// equals.right = number
-// equals.evaluate()
-// console.log(global.find("name"))
