@@ -61,7 +61,21 @@ let currentText = ""
 class Token {
     constructor(position){
         this.position = position
-    } 
+    }
+
+    check_for_float(){
+        for (let item of arguments){
+            if (item instanceof Float){
+                return true
+            }
+            if (typeof item === 'number'){
+                if (String(item).includes('.')){
+                    return true
+                }
+            }
+        }
+        return false
+    }
 }
 
 class BinaryOperator extends Token{
@@ -92,7 +106,11 @@ class Add extends BinaryOperator{
         let left = this.left.evaluate()
         let right = this.right.evaluate()
         let result = this.check_for_errors(left, right)
-        return result == null ? left + right : result
+        if (result != null){
+            return result
+        }
+        result = left.value + right.value
+        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
     }
 }
 
@@ -105,7 +123,11 @@ class Minus extends BinaryOperator{
         let left = this.left.evaluate()
         let right = this.right.evaluate()
         let result = this.check_for_errors(left, right)
-        return result == null ? left - right : result
+        if (result != null){
+            return result
+        }
+        result = left.value - right.value
+        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
     }
 }
 
@@ -118,7 +140,11 @@ class Multiply extends BinaryOperator{
         let left = this.left.evaluate()
         let right = this.right.evaluate()
         let result = this.check_for_errors(left, right)
-        return result == null ? left * right : result
+        if (result != null){
+            return result
+        }
+        result = left.value * right.value
+        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
     }
 }
 
@@ -134,10 +160,11 @@ class Divide extends BinaryOperator{
         if (result != null){
             return result
         }
-        if (right == 0){
+        if (right.value == 0){
             return new MathError(this, "Cannot divide by 0")
         }
-        return left / right
+        result = left.value * right.value
+        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
     }
 }
 
@@ -153,13 +180,15 @@ class Exponent extends BinaryOperator{
         if (result != null){
             return result
         }
-        if (isNaN(left ** right)){ // No imaginary numbers
+        result = left.value ** right.value
+        if (isNaN(result)){ // No imaginary numbers
             return new MathError(this, "Cannot raise a negative number to this power")
         }
-        return left ** right
+        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
     }
 }
 
+// =
 class Equals extends BinaryOperator{
     constructor(position){
         super(position)
@@ -173,6 +202,60 @@ class Equals extends BinaryOperator{
             return result
         }
         return left.set(right)
+    }
+}
+
+class And extends BinaryOperator{
+    constructor(position){
+        super(position)
+    }
+
+    evaluate(){
+        let left = this.left.evaluate()
+        let right = this.right.evaluate()
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
+        }
+        return new Boolean(this.position, left.value && right.value)
+    }
+}
+
+class Or extends BinaryOperator{
+    constructor(position){
+        super(position)
+    }
+
+    evaluate(){
+        let left = this.left.evaluate()
+        let right = this.right.evaluate()
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
+        }
+        return new Boolean(this.position, left.value || right.value)
+    }
+}
+
+class LogicalOperator extends BinaryOperator{
+    constructor(position){
+        super(position)
+    }
+}
+// ==
+class Equality extends LogicalOperator{
+    constructor(position){
+        super(position)
+    }
+
+    evaluate(){
+        let left = this.left.evaluate()
+        let right = this.right.evaluate()
+        let result = this.check_for_errors(left, right)
+        if (result != null){
+            return result
+        }
+        return new Boolean(this.position, left.value == right.value)
     }
 }
 
@@ -195,7 +278,11 @@ class Integer extends Token{
     }
     
     evaluate(){
-        return this.value
+        return this
+    }
+
+    display(){
+        return String(this.value)
     }
 }
 
@@ -206,7 +293,29 @@ class Float extends Token{
     }
     
     evaluate(){
-        return this.value
+        return this
+    }
+
+    display(){
+        if (this.check_for_float(this.value)){
+            return String(this.value)
+        }
+        return String(this.value) + ".0"
+    }
+}
+
+class Boolean extends Token{
+    constructor(position, value){
+        super(position)
+        this.value = value
+    }
+    
+    evaluate(){
+        return this
+    }
+
+    display(){
+        return this.value ? "True" : "False"
     }
 }
 
@@ -240,14 +349,13 @@ class TemplateKeyword extends Keyword{
     }
 }
 
-
 class Error {
     constructor(position){
         this.text = currentText
         this.position = position
     }
 
-    display(){
+    location(){
         return `${this.text}\n${' '.repeat(this.position)}^`
     }
 }
@@ -258,8 +366,8 @@ class UnexpectedCharacterError extends Error {
         this.character = character
     }
 
-    message(){
-        return ` ! ERROR\nUnexpected Character: '${this.character}'\n${this.display()}`
+    display(){
+        return ` ! ERROR\nUnexpected Character: '${this.character}'\n${this.location()}`
     }
 }
 
@@ -270,8 +378,8 @@ class SyntaxError extends Error {
         this.description = description
     }
 
-    message(){
-        return ` ! ERROR\nInvalid Syntax: ${this.description}\n${this.display()}`
+    display(){
+        return ` ! ERROR\nInvalid Syntax: ${this.description}\n${this.location()}`
     }
 }
 
@@ -282,8 +390,8 @@ class MathError extends Error {
         this.description = description
     }
 
-    message(){
-        return ` ! ERROR\nMath Error: ${this.description}\n${this.display()}`
+    display(){
+        return ` ! ERROR\nMath Error: ${this.description}\n${this.location()}`
     }
 }
 
@@ -294,8 +402,8 @@ class IdentifierError extends Error{
         this.description = description
     }
 
-    message(){
-        return ` ! ERROR\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.display()}`
+    display(){
+        return ` ! ERROR\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
     }
 }
 
@@ -337,7 +445,8 @@ class Lexer {
             } else if (this.character == '^') {
                 tokens.push(new Exponent(this.position))
             } else if (this.character == '=') {
-                tokens.push(new Equals(this.position))
+                tokens.push(this.make_equals())
+                continue
             } else if (this.character == '(') {
                 tokens.push(new LeftBracket(this.position))
             } else if (this.character == ')') {
@@ -378,9 +487,26 @@ class Lexer {
         switch (name) {
             case "const":
                 return new TemplateKeyword(position, "const")
+            case "True":
+                return new Boolean(position, true)
+            case "False":
+                return new Boolean(position, false)
+            case "AND":
+                return new And(position)
+            case "OR":
+                return new Or(position)
             default:
                 return new Identifier(position, name)
         }
+    }
+
+    make_equals(){
+        this.continue()
+        if (this.character == '='){
+            this.continue()
+            return new Equality(this.position-2)
+        }
+        return new Equals(this.position-1)
     }
 }
 
@@ -402,9 +528,9 @@ class Parser {
         this.continue()
     }
 
-    // Takes in an array and checks if current token is instance of the items
-    check_instance(check) {
-        for (let item of check){
+    // Takes in an the classes as arguments and checks if current token is instance of the items
+    check_instance() {
+        for (let item of arguments){
             if (this.token instanceof item){
                 return true
             }
@@ -432,8 +558,8 @@ class Parser {
                 return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
             }
         }
-        // Left over case is just an expression
-        let result = this.expression(this)
+        // Left over case is just an expression or a statement
+        let result = this.statement_chain(this)
         return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
     }
 
@@ -445,15 +571,15 @@ class Parser {
     }
 
     factor(self){
-        if (self.check_instance([Integer, Float, Identifier])){
+        if (self.check_instance(Integer, Float, Identifier)){
             let result = self.token
             self.continue()
             return result
-        } else if (self.check_instance([LeftBracket])){
+        } else if (self.check_instance(LeftBracket)){
             let errorToken = self.token
             self.continue()
             let result = self.expression(self)
-            if (self.check_instance([RightBracket])){
+            if (self.check_instance(RightBracket)){
                 self.continue()
                 return result
             }
@@ -493,6 +619,47 @@ class Parser {
 
     expression(self){
         return self.parse_binary_operator(self, self.term, [Add, Minus])
+    }
+
+    statement(self){
+        let left // Left side of statement
+        if (self.token instanceof Boolean){
+            left = self.token
+            self.continue()
+        } else {
+            left = self.expression(self)
+        }
+        if (left instanceof Error || self.token == null){ // Check if just a normal expression and not a statement
+            return left
+        }
+        let result = self.token
+        if (!(result instanceof LogicalOperator)){ // Middle
+            if (self.check_result(result)){
+                return result
+            }
+            if (left instanceof Boolean){
+                return left
+            }
+            return new SyntaxError(self.token, "Expected operator")
+        }
+        self.continue()
+        let right // Right side of statement
+        if (self.token instanceof Boolean){
+            right = self.token
+            self.continue()
+        } else {
+            right = self.expression(self)
+        }
+        if (right instanceof Error){
+            return right
+        }
+        result.left = left
+        result.right = right
+        return result
+    }
+
+    statement_chain(self){
+        return self.parse_binary_operator(self, self.statement, [And, Or])
     }
 
     assignment(self, tag=null){
@@ -536,7 +703,7 @@ class Parser {
         if (result instanceof Error){
             return result
         }
-        while (self.token != null && self.check_instance(tokens)){
+        while (self.token != null && self.check_instance(...tokens)){
             self.token.left = result
             result = self.token
             self.continue()
@@ -570,24 +737,20 @@ class Shell {
         currentText = input
         let tokens = new Lexer(input).make_tokens()
         if (tokens instanceof Error){
-            console.log(tokens.message())
+            console.log(tokens.display())
             return
         }
         let parsed = new Parser(tokens).parse()
         if (parsed instanceof Error){
-            console.log(parsed.message())
+            console.log(parsed.display())
             return
         }
         if (parsed == null){
             return
         }
         let evaluated = parsed.evaluate()
-        if (evaluated instanceof Error){
-            console.log(evaluated.message())
-            return
-        }
         if (evaluated != null){
-            console.log(evaluated)
+            console.log(evaluated.display())
         }
         return
     }
