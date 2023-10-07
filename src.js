@@ -543,6 +543,10 @@ class Parser {
         if (this.token == null){
             return null
         }
+        // Check if the first token is a binary operator
+        if (this.token instanceof BinaryOperator){
+            return new SyntaxError(this.token, "Expected literal")
+        }
         // Check if there is a tagged assignment
         if (this.token instanceof TemplateKeyword){
             let result = this.assignment(this, this.token.tag)
@@ -575,23 +579,20 @@ class Parser {
             let result = self.token
             self.continue()
             return result
-        } else if (self.check_instance(LeftBracket)){
-            let errorToken = self.token
-            self.continue()
-            let result = self.expression(self)
-            if (self.check_instance(RightBracket)){
-                self.continue()
-                return result
-            }
-            return new SyntaxError(errorToken,  "'(' was never closed")
-        } else if (self.check_instance([Add])){ // Add unary operator
+        }
+        let result = self.parse_brackets(self, LeftBracket, RightBracket, self.expression)
+        if (result != null){
+            return result
+        }
+        if (self.check_instance(Add)){ // Add unary operator
             let errorToken = self.token
             self.continue()
             if (self.token == null){
                 return new SyntaxError(errorToken.position, "Incomplete input")
             }
             return self.factor(self)
-        } else if (self.check_instance([Minus])){ // Minus unary operator
+        } 
+        if (self.check_instance(Minus)){ // Minus unary operator
             let errorToken = self.token
             self.continue()
             if (self.token == null){
@@ -621,14 +622,31 @@ class Parser {
         return self.parse_binary_operator(self, self.term, [Add, Minus])
     }
 
-    statement(self){
-        let left // Left side of statement
-        if (self.token instanceof Boolean){
-            left = self.token
-            self.continue()
-        } else {
-            left = self.expression(self)
+    half_statement(self){
+        let bracketCheck = self.parse_brackets(self, LeftBracket, RightBracket, self.statement_chain)
+        if (bracketCheck != null){
+            return bracketCheck
         }
+        if (self.token instanceof Identifier){
+            let result = self.token.evaluate()
+            if (result instanceof Boolean){
+                self.continue()
+                return result
+            }
+        }
+        if (self.token instanceof Boolean){
+            let result = self.token
+            self.continue()
+            return result
+        }
+        if (self.token instanceof BinaryOperator){
+            return new SyntaxError(self.token, "Expected literal")
+        }
+        return self.expression(self)
+    }
+
+    statement(self){
+        let left = self.half_statement(self)
         if (left instanceof Error || self.token == null){ // Check if just a normal expression and not a statement
             return left
         }
@@ -643,13 +661,10 @@ class Parser {
             return new SyntaxError(self.token, "Expected operator")
         }
         self.continue()
-        let right // Right side of statement
-        if (self.token instanceof Boolean){
-            right = self.token
-            self.continue()
-        } else {
-            right = self.expression(self)
+        if (self.token == null){
+            return new SyntaxError(result, "Incomplete input")
         }
+        let right = self.half_statement(self)
         if (right instanceof Error){
             return right
         }
@@ -685,7 +700,7 @@ class Parser {
         if (self.token == null){
             return new SyntaxError(errorToken, "Incomplete input")
         }
-        let right = self.expression(self)
+        let right = self.statement_chain(self)
         if (right instanceof Error){
             return right
         }
@@ -716,6 +731,18 @@ class Parser {
             }
         }
         return result
+    }
+
+    parse_brackets(self, start, end, nextFunction){
+        let bracket = self.token
+        if (bracket instanceof start){
+            let tokens = []
+            self.continue()
+            while (self.token != null && !(self.token instanceof end)){
+                
+            }
+        }
+        return null
     }
 }
 
