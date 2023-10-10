@@ -53,6 +53,7 @@ class DataType {
 
 // Global usage
 const prompt = require('prompt-sync')()
+const fs = require('fs')
 const DIGITS = [..."0123456789"]
 const LETTERS = [..."qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"]
 let global = new SymbolTable()
@@ -61,6 +62,10 @@ let currentText = ""
 class Token {
     constructor(position){
         this.position = position
+    }
+
+    evaluate(){
+        return this
     }
 
     check_for_float(){
@@ -238,14 +243,9 @@ class Or extends BinaryOperator{
 }
 
 class LogicalOperator extends BinaryOperator{
-    constructor(position){
+    constructor(position, tag){
         super(position)
-    }
-}
-// ==
-class Equality extends LogicalOperator{
-    constructor(position){
-        super(position)
+        this.tag = tag
     }
 
     evaluate(){
@@ -255,7 +255,20 @@ class Equality extends LogicalOperator{
         if (result != null){
             return result
         }
-        return new Boolean(this.position, left.value == right.value)
+        switch (this.tag){
+            case "==":
+                return new Boolean(this.position, left.value == right.value)
+            case ">":
+                return new Boolean(this.position, left.value > right.value)
+            case ">=":
+                return new Boolean(this.position, left.value >= right.value)
+            case "<":
+                return new Boolean(this.position, left.value < right.value)
+            case "<=":
+                return new Boolean(this.position, left.value <= right.value)
+            case "!=":
+                return new Boolean(this.position, left.value != right.value)
+        }
     }
 }
 
@@ -276,10 +289,6 @@ class Integer extends Token{
         super(position)
         this.value = value
     }
-    
-    evaluate(){
-        return this
-    }
 
     display(){
         return String(this.value)
@@ -290,10 +299,6 @@ class Float extends Token{
     constructor(position, value){
         super(position)
         this.value = value
-    }
-    
-    evaluate(){
-        return this
     }
 
     display(){
@@ -308,10 +313,6 @@ class Boolean extends Token{
     constructor(position, value){
         super(position)
         this.value = value
-    }
-    
-    evaluate(){
-        return this
     }
 
     display(){
@@ -341,7 +342,7 @@ class Keyword extends Token{
     }
 }
 
-// For generic keywords like const, global which don't need a unique object object
+// For generic keywords like const, global which don't need a unique object
 class TemplateKeyword extends Keyword{
     constructor(position, tag){
         super(position)
@@ -444,8 +445,8 @@ class Lexer {
                 tokens.push(new Divide(this.position))
             } else if (this.character == '^') {
                 tokens.push(new Exponent(this.position))
-            } else if (this.character == '=') {
-                tokens.push(this.make_equals())
+            } else if (['=','<','>','!'].includes(this.character)){
+                tokens.push(this.make_logical_operator())
                 continue
             } else if (this.character == '(') {
                 tokens.push(new LeftBracket(this.position))
@@ -500,13 +501,21 @@ class Lexer {
         }
     }
 
-    make_equals(){
+    make_logical_operator(){
+        let initialCharacter = this.character
         this.continue()
         if (this.character == '='){
             this.continue()
-            return new Equality(this.position-2)
+            return new LogicalOperator(this.position-2, initialCharacter+'=')
         }
-        return new Equals(this.position-1)
+        switch (initialCharacter){
+            case '=':
+                return new Equals(this.position-1)
+            case '!':
+                return new UnexpectedCharacterError(this.position-1, initialCharacter)
+            default:
+                return new LogicalOperator(this.position-1, initialCharacter)
+        }
     }
 }
 
@@ -619,7 +628,11 @@ class Parser {
     }
 
     expression(self){
-        return self.parse_binary_operator(self, self.term, [Add, Minus])
+        let result = self.parse_binary_operator(self, self.term, [Add, Minus])
+        if (self.check_instance(Integer, Float, Identifier)){
+            return new SyntaxError(self.token, "Expected operator")
+        }
+        return result
     }
 
     half_statement(self){
@@ -736,11 +749,16 @@ class Parser {
     parse_brackets(self, start, end, nextFunction){
         let bracket = self.token
         if (bracket instanceof start){
-            let tokens = []
             self.continue()
-            while (self.token != null && !(self.token instanceof end)){
-                
+            let result = nextFunction(self)
+            if (result instanceof Error){
+                return result
             }
+            if (self.token instanceof end){
+                self.continue()
+                return result
+            }
+            return new SyntaxError(bracket, "'(' was never closed")
         }
         return null
     }
@@ -749,7 +767,6 @@ class Parser {
 
 class Shell {
     constructor() {
-        this.main()
     }
 
     main(){ // Can only be run in terminal as inputs don't work in VScode
@@ -783,4 +800,26 @@ class Shell {
     }
 }
 
-new Shell()
+class RunFile extends Shell{
+    constructor(fileName){
+        super()
+        this.fileName = fileName
+        this.program = this.get_plaintext()
+    }
+
+    get_plaintext(){
+        try {
+            return fs.readFileSync(this.fileName, 'utf8').split("\n")
+          } catch (err) {
+            console.error(err)
+          }
+    }
+
+    main(){ 
+        for (let line of this.program){
+            this.run(line)
+        }
+    }
+}
+
+new RunFile("code.erl").main()
