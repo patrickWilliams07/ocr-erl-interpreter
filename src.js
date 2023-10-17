@@ -409,18 +409,29 @@ class IdentifierError extends Error{
 }
 
 class Lexer {
-    constructor(input){
-        this.input = input
+    constructor(program){
+        this.program = program
+        this.row = -1
         this.position = -1
+        this.line = null
         this.character = null
+        this.advance_line()
+    }
+
+    advance_line(){
+        this.row += 1
+        this.line = this.row == this.program.length ? null : this.program[this.line]
+        this.position = -1
         this.continue()
     }
 
     continue(){
         this.position += 1
-        this.character = this.position == this.input.length ? null : this.input[this.position]
+        this.character = this.position == this.line.length ? null : this.line[this.position]
     }
 
+
+    
     make_tokens(){
         let tokens = []
         while (this.character != null){
