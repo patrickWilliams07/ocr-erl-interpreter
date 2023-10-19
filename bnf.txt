@@ -1,14 +1,4 @@
-/*
-SYNTAX:
-<name> = nonterminal
-name = terminal
-::= = decleration
-| = OR
-{} = repeat 0 --> ∞ times
-(a|b) = make an option
-[+|-] = optional choice
-*/
-<expr> ::= <term>{(+|-)<term>}
-<term> ::= <factor>{(*|/)<factor>}
-<power> ::= <exp>{^<exp>}
-<factor> ::= (<expr>)|id|literal
+<expression> ::= <term> { (Plus | Minus ) <term> }
+<term> ::= <exponent> { ( Multiply | Divide ) <exponent> }
+<exponent> ::= <factor> { Exponent <factor> }
+<factor> ::= Integer | Float | LeftBracket <expression> RightBracket | ( Plus | Minus ) <factor>
