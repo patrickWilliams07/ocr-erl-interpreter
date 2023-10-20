@@ -1,3 +1,5 @@
-a = 5
-a + 2
-a >= 3 
+if False then
+	1
+elseif True then
+	2
+endif

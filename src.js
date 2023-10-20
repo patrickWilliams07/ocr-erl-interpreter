@@ -54,14 +54,16 @@ class DataType {
 // Global usage
 const prompt = require('prompt-sync')()
 const fs = require('fs')
+const { isArray } = require('util')
 const DIGITS = [..."0123456789"]
 const LETTERS = [..."qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"]
 let global = new SymbolTable()
-let currentText = ""
+let currentText = []
 
 class Token {
-    constructor(position){
+    constructor(position, line){
         this.position = position
+        this.line = line
     }
 
     evaluate(){
@@ -84,8 +86,8 @@ class Token {
 }
 
 class BinaryOperator extends Token{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
         this.left = null
         this.right = null
     }
@@ -103,8 +105,8 @@ class BinaryOperator extends Token{
 }
 
 class Add extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
     
     evaluate(){
@@ -115,13 +117,13 @@ class Add extends BinaryOperator{
             return result
         }
         result = left.value + right.value
-        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
+        return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
 }
 
 class Minus extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
     
     evaluate(){
@@ -132,13 +134,13 @@ class Minus extends BinaryOperator{
             return result
         }
         result = left.value - right.value
-        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
+        return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
 }
 
 class Multiply extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
     
     evaluate(){
@@ -149,13 +151,13 @@ class Multiply extends BinaryOperator{
             return result
         }
         result = left.value * right.value
-        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
+        return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
 }
 
 class Divide extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
     
     evaluate(){
@@ -169,13 +171,13 @@ class Divide extends BinaryOperator{
             return new MathError(this, "Cannot divide by 0")
         }
         result = left.value * right.value
-        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
+        return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
 }
 
 class Exponent extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
     
     evaluate(){
@@ -189,14 +191,14 @@ class Exponent extends BinaryOperator{
         if (isNaN(result)){ // No imaginary numbers
             return new MathError(this, "Cannot raise a negative number to this power")
         }
-        return this.check_for_float(left, right, result) ? new Float(this.position, result) : new Integer(this.position, result)
+        return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
 }
 
 // =
 class Equals extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
 
     evaluate(){
@@ -211,8 +213,8 @@ class Equals extends BinaryOperator{
 }
 
 class And extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
 
     evaluate(){
@@ -222,13 +224,13 @@ class And extends BinaryOperator{
         if (result != null){
             return result
         }
-        return new Boolean(this.position, left.value && right.value)
+        return new Boolean(this.position, this.line, left.value && right.value)
     }
 }
 
 class Or extends BinaryOperator{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
 
     evaluate(){
@@ -238,13 +240,13 @@ class Or extends BinaryOperator{
         if (result != null){
             return result
         }
-        return new Boolean(this.position, left.value || right.value)
+        return new Boolean(this.position, this.line, left.value || right.value)
     }
 }
 
 class LogicalOperator extends BinaryOperator{
-    constructor(position, tag){
-        super(position)
+    constructor(position, line, tag){
+        super(position, line)
         this.tag = tag
     }
 
@@ -257,36 +259,36 @@ class LogicalOperator extends BinaryOperator{
         }
         switch (this.tag){
             case "==":
-                return new Boolean(this.position, left.value == right.value)
+                return new Boolean(this.position, this.line, left.value === right.value)
             case ">":
-                return new Boolean(this.position, left.value > right.value)
+                return new Boolean(this.position, this.line, left.value > right.value)
             case ">=":
-                return new Boolean(this.position, left.value >= right.value)
+                return new Boolean(this.position, this.line, left.value >= right.value)
             case "<":
-                return new Boolean(this.position, left.value < right.value)
+                return new Boolean(this.position, this.line, left.value < right.value)
             case "<=":
-                return new Boolean(this.position, left.value <= right.value)
+                return new Boolean(this.position, this.line, left.value <= right.value)
             case "!=":
-                return new Boolean(this.position, left.value != right.value)
+                return new Boolean(this.position, this.line, left.value != right.value)
         }
     }
 }
 
 class LeftBracket extends Token{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
 }
 
 class RightBracket extends Token{
-    constructor(position){
-        super(position)
+    constructor(position, line){
+        super(position, line)
     }
 }
 
 class Integer extends Token{
-    constructor(position, value){
-        super(position)
+    constructor(position, line, value){
+        super(position, line)
         this.value = value
     }
 
@@ -296,8 +298,8 @@ class Integer extends Token{
 }
 
 class Float extends Token{
-    constructor(position, value){
-        super(position)
+    constructor(position, line, value){
+        super(position, line)
         this.value = value
     }
 
@@ -310,8 +312,8 @@ class Float extends Token{
 }
 
 class Boolean extends Token{
-    constructor(position, value){
-        super(position)
+    constructor(position, line, value){
+        super(position, line)
         this.value = value
     }
 
@@ -321,8 +323,8 @@ class Boolean extends Token{
 }
 
 class Identifier extends Token{
-    constructor(position, name, constant=false){
-        super(position)
+    constructor(position, line, name, constant=false){
+        super(position, line)
         this.name = name
         this.constant = constant
     }
@@ -336,24 +338,66 @@ class Identifier extends Token{
     }
 }
 
-class Keyword extends Token{
-    constructor(position){
-        super(position)
-    }
-}
-
 // For generic keywords like const, global which don't need a unique object
-class TemplateKeyword extends Keyword{
-    constructor(position, tag){
-        super(position)
+class TemplateKeyword extends Token{
+    constructor(position, line, tag){
+        super(position, line)
         this.tag = tag
     }
 }
 
+class IfStatement extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.cases = []
+        this.elseCase = null
+    }
+
+    evaluate(){
+        for (let ifCase of this.cases){
+            let result = ifCase.condition.evaluate()
+            if (result instanceof Error){
+                return result
+            }
+            if (result.value === true){
+                return ifCase.contents
+            }
+        }
+        if (this.elseCase != null){
+            return this.elseCase.contents
+        }
+        return null
+    }
+}
+
+class IfCase extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.condition = null
+        this.contents = []
+    }
+}
+
+class ElseCase extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.contents = []
+    }
+}
+
+class While extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.condition = null
+        this.contents = []
+    }
+}
+
 class Error {
-    constructor(position){
-        this.text = currentText
+    constructor(position, line){
         this.position = position
+        this.line = line + 1
+        this.text = currentText[line]
     }
 
     location(){
@@ -362,80 +406,93 @@ class Error {
 }
 
 class UnexpectedCharacterError extends Error {
-    constructor(position, character) {
-        super(position)
+    constructor(position, line, character) {
+        super(position, line)
         this.character = character
     }
 
     display(){
-        return ` ! ERROR\nUnexpected Character: '${this.character}'\n${this.location()}`
+        return ` ! ERROR @line ${this.line}\nUnexpected Character: '${this.character}'\n${this.location()}`
     }
 }
 
 class SyntaxError extends Error {
     constructor(token, description='') {
-        super(token.position)
+        super(token.position, token.line)
         this.token = token
         this.description = description
     }
 
     display(){
-        return ` ! ERROR\nInvalid Syntax: ${this.description}\n${this.location()}`
+        return ` ! ERROR @line ${this.line}\nInvalid Syntax: ${this.description}\n${this.location()}`
     }
 }
 
 class MathError extends Error {
     constructor(token, description='') {
-        super(token.position)
+        super(token.position, token.line)
         this.token = token
         this.description = description
     }
 
     display(){
-        return ` ! ERROR\nMath Error: ${this.description}\n${this.location()}`
+        return ` ! ERROR @line ${this.line}\nMath Error: ${this.description}\n${this.location()}`
     }
 }
 
 class IdentifierError extends Error{
     constructor(token, description='') {
-        super(token.position)
+        super(token.position, token.line)
         this.token = token
         this.description = description
     }
 
     display(){
-        return ` ! ERROR\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
+        return ` ! ERROR @line ${this.line}\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
     }
 }
 
 class Lexer {
     constructor(program){
-        this.program = program
-        this.row = -1
+        this.allPlaintext = program
+        this.line = -1
+        this.currentPlaintext = null
         this.position = -1
-        this.line = null
         this.character = null
         this.advance_line()
     }
 
     advance_line(){
-        this.row += 1
-        this.line = this.row == this.program.length ? null : this.program[this.line]
+        this.line += 1
+        this.currentPlaintext = this.line == this.allPlaintext.length ? null : this.allPlaintext[this.line]
         this.position = -1
-        this.continue()
     }
 
     continue(){
         this.position += 1
-        this.character = this.position == this.line.length ? null : this.line[this.position]
+        this.character = this.position == this.currentPlaintext.length ? null : this.currentPlaintext[this.position]
     }
 
-
-    
     make_tokens(){
+        let file = []
+        while (this.currentPlaintext != null){
+            this.continue()
+            let result = this.make_tokens_line()
+            if (result instanceof Error){
+                return result
+            }
+            if (result.length >= 1){
+                file.push(result)
+            }
+            this.advance_line()
+        }
+        return file
+    }
+    
+    make_tokens_line(){
         let tokens = []
         while (this.character != null){
-            if (this.character == ' '){
+            if (this.character == ' ' || this.character == "\t"){
             } else if (DIGITS.includes(this.character)) {
                 let number = this.make_number()
                 if (number instanceof Error) {
@@ -447,24 +504,29 @@ class Lexer {
                 tokens.push(this.make_identifier())
                 continue
             } else if (this.character == '+') {
-                tokens.push(new Add(this.position))
+                tokens.push(new Add(this.position, this.line))
             } else if (this.character == '-') {
-                tokens.push(new Minus(this.position))
+                tokens.push(new Minus(this.position, this.line))
             } else if (this.character == '*') {
-                tokens.push(new Multiply(this.position))
+                tokens.push(new Multiply(this.position, this.line))
             } else if (this.character == '/') {
-                tokens.push(new Divide(this.position))
+                this.continue()
+                if (this.character = '/'){ // Comment
+                    return tokens
+                }
+                tokens.push(new Divide(this.position-1, this.line))
+                continue
             } else if (this.character == '^') {
-                tokens.push(new Exponent(this.position))
+                tokens.push(new Exponent(this.position, this.line))
             } else if (['=','<','>','!'].includes(this.character)){
                 tokens.push(this.make_logical_operator())
                 continue
             } else if (this.character == '(') {
-                tokens.push(new LeftBracket(this.position))
+                tokens.push(new LeftBracket(this.position, this.line))
             } else if (this.character == ')') {
-                tokens.push(new RightBracket(this.position))
+                tokens.push(new RightBracket(this.position, this.line))
             } else { // Not recognised
-                return new UnexpectedCharacterError(this.position, this.character)
+                return new UnexpectedCharacterError(this.position, this.line, this.character)
             }
             this.continue()
         }
@@ -485,7 +547,7 @@ class Lexer {
             }
             this.continue()
         }
-        return fullStops == 0 ? new Integer(position, Number(number.join(''))) : new Float(position, Number(number.join('')))
+        return fullStops == 0 ? new Integer(position, this.line, Number(number.join(''))) : new Float(position, this.line, Number(number.join('')))
     }
 
     make_identifier(){
@@ -497,18 +559,29 @@ class Lexer {
         }
         name = name.join('')
         switch (name) {
-            case "const":
-                return new TemplateKeyword(position, "const")
             case "True":
-                return new Boolean(position, true)
+                return new Boolean(position,this.line, true)
             case "False":
-                return new Boolean(position, false)
+                return new Boolean(position,this.line, false)
             case "AND":
-                return new And(position)
+                return new And(position, this.line)
             case "OR":
-                return new Or(position)
+                return new Or(position, this.line)
+            case "if":
+                return new IfStatement(position, this.line)
+            case "elseif":
+                return new IfCase(position, this.line)
+            case "else":
+                return new ElseCase(position, this.line)
+            case "while":
+                return new While(position, this.linee)
+            case "const":
+            case "then":
+            case "endif":
+            case "endwhile":
+                return new TemplateKeyword(position, this.line, name)
             default:
-                return new Identifier(position, name)
+                return new Identifier(position, this.line, name)
         }
     }
 
@@ -517,30 +590,37 @@ class Lexer {
         this.continue()
         if (this.character == '='){
             this.continue()
-            return new LogicalOperator(this.position-2, initialCharacter+'=')
+            return new LogicalOperator(this.position-2, this.line, initialCharacter+'=')
         }
         switch (initialCharacter){
             case '=':
-                return new Equals(this.position-1)
+                return new Equals(this.position-1, this.line)
             case '!':
-                return new UnexpectedCharacterError(this.position-1, initialCharacter)
+                return new UnexpectedCharacterError(this.position-1, this.line, initialCharacter)
             default:
-                return new LogicalOperator(this.position-1, initialCharacter)
+                return new LogicalOperator(this.position-1, this.line, initialCharacter)
         }
     }
 }
 
 class Parser {
-    constructor(tokens){    
-        this.tokens = tokens
+    constructor(tokens){
+        this.allTokens = tokens
+        this.line = -1
+        this.currentTokens = null
         this.position = -1
-        this.token = null
-        this.continue()
+        this.character = null
+    }
+
+    advance_line(){
+        this.line += 1
+        this.currentTokens = this.line == this.allTokens.length ? null : this.allTokens[this.line]
+        this.position = -1
     }
 
     continue(){
         this.position += 1
-        this.token = this.position == this.tokens.length ? null : this.tokens[this.position]
+        this.token = this.position == this.currentTokens.length ? null : this.currentTokens[this.position]
     }
 
     reset(){
@@ -558,10 +638,26 @@ class Parser {
         return false
     }
 
+    parse_next(){
+        this.advance_line()
+        if (this.currentTokens == null){
+            return null
+        }
+        this.continue()
+        return this.parse()
+    }
+
     parse(){
         // Check if there are no tokens
         if (this.token == null){
             return null
+        }
+        // Checks if an if statement is being built
+        if (this.token instanceof IfStatement){
+            return this.build_if_chain(this)
+        }
+        if (this.check_instance(IfCase, ElseCase)){
+            return new SyntaxError(this.token, "Needs to follow 'if' statement")
         }
         // Check if the first token is a binary operator
         if (this.token instanceof BinaryOperator){
@@ -569,8 +665,13 @@ class Parser {
         }
         // Check if there is a tagged assignment
         if (this.token instanceof TemplateKeyword){
-            let result = this.assignment(this, this.token.tag)
-            return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+            switch(this.token.tag){
+                case "const":
+                    let result = this.assignment(this, this.token.tag)
+                    return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+                case "endif":
+                    return new SyntaxError(this.token, "Needs to follow 'if' statement")
+            }
         }
         // Check if it is a normal assignment
         if (this.token instanceof Identifier){
@@ -651,13 +752,6 @@ class Parser {
         if (bracketCheck != null){
             return bracketCheck
         }
-        if (self.token instanceof Identifier){
-            let result = self.token.evaluate()
-            if (result instanceof Boolean){
-                self.continue()
-                return result
-            }
-        }
         if (self.token instanceof Boolean){
             let result = self.token
             self.continue()
@@ -679,10 +773,7 @@ class Parser {
             if (self.check_result(result)){
                 return result
             }
-            if (left instanceof Boolean){
-                return left
-            }
-            return new SyntaxError(self.token, "Expected operator")
+            return left
         }
         self.continue()
         if (self.token == null){
@@ -733,6 +824,87 @@ class Parser {
         return result
     }
 
+    if_statement(self, ifToken){
+        self.continue() // Continues past initial token
+        if (self.token == null){
+            return new SyntaxError(ifToken, "Expected expression after 'if")
+        }
+        let result = self.statement_chain(self) // Gets statement to check
+        if (result instanceof Error){
+            return result
+        }
+        if (self.token instanceof TemplateKeyword){
+            if (self.token.tag == "then"){ // Checks if line finishes witt then
+                ifToken.condition = result
+                self.continue()
+                if (self.token == null){
+                    return ifToken
+                }
+                return new SyntaxError(self.token, "Unexpected token after 'then'") // Tokens after then
+            }
+        }
+        if (self.token == null){ // No then is included, points to if statement
+            return new SyntaxError(ifToken, "If statement must end with 'then")
+        } // No then and extra tokens, points to extra tokens
+        return new SyntaxError(self.token, "Expected 'then")
+    }
+
+    build_if_chain(self){
+        let mainStatement = self.token // Stores the entire chain
+        let currentIfStatement = self.if_statement(self, new IfCase(self.token.position, self.token.line)) // Creating first if case
+        if (currentIfStatement instanceof Error){
+            return currentIfStatement
+        }
+        self.advance_line() // Advances line
+        while(self.currentTokens != null){
+            self.continue()
+            if (self.token instanceof IfCase){ // Checkes for elif
+                mainStatement.cases.push(currentIfStatement) // Pushes old if case
+                currentIfStatement = self.if_statement(self, self.token) // Creates new if case
+                if (currentIfStatement instanceof Error){
+                    return currentIfStatement
+                }
+            } else if (self.token instanceof ElseCase){
+                mainStatement.cases.push(currentIfStatement) // Pushes old if case
+                currentIfStatement = self.token
+                self.advance_line()
+                while(self.currentTokens != null){ // Loops through remaining tokens
+                    self.continue()
+                    if (self.token instanceof TemplateKeyword){ // Check for endif
+                        if (self.token.tag == "endif"){
+                            mainStatement.elseCase = currentIfStatement // Adds else case
+                            return mainStatement
+                        }
+                    }
+                    let result = self.parse() // Adds the asts
+                    if (result instanceof Error){
+                        return result
+                    }
+                    currentIfStatement.contents.push(result)
+                    self.advance_line()
+                }
+                return new SyntaxError(mainStatement, "Expected endif at end of if statement") // Not complete
+            } else if (self.token instanceof TemplateKeyword){ // Check for endif
+                if (self.token.tag == "endif"){
+                    mainStatement.cases.push(currentIfStatement) // Pushes old if case
+                    return mainStatement
+                } // Otherwise do defauly
+                let result = self.parse()
+                if (result instanceof Error){
+                    return result
+                }
+                currentIfStatement.contents.push(result)
+            } else {
+                let result = self.parse() // Dafault
+                if (result instanceof Error){
+                    return result
+                }
+                currentIfStatement.contents.push(result) //Add AST to the currents contents
+            }
+            self.advance_line()
+        }
+        return new SyntaxError(mainStatement, "Expected endif at end of if statement") // Not complete
+    }
 
     // First parameter = References the instance of the parser
     // Second parameter = Method to call that is beneath the current one
@@ -775,62 +947,101 @@ class Parser {
     }
 }
 
-
-class Shell {
-    constructor() {
+class Interpreter { 
+    constructor(){
+        this.plaintext = null
+        this.tokens = []
+        this.have_tokens = false
     }
 
-    main(){ // Can only be run in terminal as inputs don't work in VScode
-        let input = prompt(" ERL ==> ")
-        while (input != "QUIT()"){
-            this.run(input)
-            input = prompt(" ERL ==> ")
-        }
-    }
-
-    run(input){
-        currentText = input
-        let tokens = new Lexer(input).make_tokens()
-        if (tokens instanceof Error){
-            console.log(tokens.display())
-            return
-        }
-        let parsed = new Parser(tokens).parse()
-        if (parsed instanceof Error){
-            console.log(parsed.display())
-            return
-        }
-        if (parsed == null){
-            return
-        }
-        let evaluated = parsed.evaluate()
-        if (evaluated != null){
-            console.log(evaluated.display())
-        }
-        return
-    }
-}
-
-class RunFile extends Shell{
-    constructor(fileName){
-        super()
-        this.fileName = fileName
-        this.program = this.get_plaintext()
-    }
-
-    get_plaintext(){
+    get_plaintext_from_file(fileName){
         try {
-            return fs.readFileSync(this.fileName, 'utf8').split("\n")
-          } catch (err) {
+            this.plaintext = fs.readFileSync(fileName, 'utf8').split("\n")
+            currentText = this.plaintext
+        } catch (err) {
             console.error(err)
-          }
+        }
+        this.have_tokens = false
     }
 
-    main(){ 
-        for (let line of this.program){
-            this.run(line)
+    set_plaintext_manually(string){
+        this.plaintext = string.split("\n")
+        currentText = this.plaintext
+        this.have_tokens = false
+    }
+
+    make_tokens(){
+        let result = new Lexer(this.plaintext).make_tokens()
+        if (result instanceof Error){
+            return result
         }
+        this.tokens = result
+        this.have_tokens = true
+    }
+
+    evaluate_asts(asts){
+        if (!Array.isArray(asts)){
+            asts = [asts]
+        }
+        for (let ast of asts){
+            if (ast instanceof IfStatement){
+                return this.evaluate_asts(ast.evaluate())
+            }
+            if (ast instanceof Error){
+                console.log(ast.display())
+                return 1
+            }
+            if (ast == null){
+                continue
+            }
+            let evaluated = ast.evaluate()
+            if (evaluated != null){
+                console.log(evaluated.display())
+            }
+            if (evaluated instanceof Error){
+                return 1
+            }
+        }
+        return 0
+    }
+
+    run(){
+        if (!this.have_tokens){
+            let result = this.make_tokens()
+            if (result instanceof Error){
+                console.log(result.display())
+                return 1
+            }
+        }
+        let parser = new Parser(this.tokens)
+        let ast = parser.parse_next()
+        while (ast != null){
+            let result = this.evaluate_asts(ast)
+            if (result == 1){
+                return 1
+            }
+            ast = parser.parse_next()
+        }
+        return 0
+    }
+
+    shell(){
+        this.set_plaintext_manually(prompt(" ERL ==> "))
+        while (this.plaintext != "QUIT()"){
+            this.run()
+            this.set_plaintext_manually(prompt(" ERL ==> "))
+        }
+    }
+
+    run_file(fileName){
+        this.get_plaintext_from_file(fileName)
+        let code = this.run()
+        console.log(`\nExited with code ${code}`)
     }
 }
 
-new RunFile("code.erl").main()
+let commandLineArguments = process.argv
+main = new Interpreter()
+if (arguments.length > 2){
+    main.run_file(commandLineArguments[2])
+}
