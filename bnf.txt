@@ -1,4 +1,0 @@
-<expression> ::= <term> { (Plus | Minus ) <term> }
-<term> ::= <exponent> { ( Multiply | Divide ) <exponent> }
-<exponent> ::= <factor> { Exponent <factor> }
-<factor> ::= Integer | Float | LeftBracket <expression> RightBracket | ( Plus | Minus ) <factor>

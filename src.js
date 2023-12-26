@@ -47,6 +47,7 @@ class DataType {
         }
         this.declared = true
         this._value = newValue
+        print(this.name, "SET TO", this.newValue.value)
         return null
     }
 }
@@ -167,7 +168,7 @@ class Divide extends BinaryOperator{
             return result
         }
         if (right.value == 0){
-            return new MathError(this, "Cannot divide by 0")
+            return new EvaluationError(this, "Cannot divide by 0")
         }
         result = left.value / right.value
         return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
@@ -188,7 +189,7 @@ class Exponent extends BinaryOperator{
         }
         result = left.value ** right.value
         if (isNaN(result)){ // No imaginary numbers
-            return new MathError(this, "Cannot raise a negative number to this power")
+            return new EvaluationError(this, "Cannot raise a negative number to this power")
         }
         return this.check_for_float(left, right, result) ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
     }
@@ -387,7 +388,6 @@ class ElseCase extends Token{
 class Loop extends Token{
     constructor(position, line){
         super(position, line)
-        this.condition = null
         this.contents = []
     }
 
@@ -399,6 +399,7 @@ class Loop extends Token{
 class While extends Loop{
     constructor(position, line){
         super(position, line)
+        this.condition = null
     }
 
     evaluate_condition(){
@@ -408,11 +409,14 @@ class While extends Loop{
         }
         return condition.value
     }
+
+    reset = () => null
 }
 
 class Do extends Loop{
     constructor(position, line){
         super(position, line)
+        this.condition = null
         this.firstPassComplete = false
     }
 
@@ -427,6 +431,10 @@ class Do extends Loop{
         }
         return !condition.value
     }
+
+    reset(){
+        this.firstPassComplete = false
+    }
 }
 
 class For extends Loop{
@@ -434,28 +442,70 @@ class For extends Loop{
         super(position, line)
         this.firstPassComplete = false
         this.variable = null
+        this.currentVariableValue = null
         this.assignment = null
         this.finish = null
         this.step = null
+        this.increasing = null
+    }
+
+    first_pass(){
+        let assignment = this.assignment.evaluate()
+        if (assignment instanceof Error){
+            return assignment
+        }
+        let result = this.variable.evaluate()
+        if (!(result instanceof Integer)){
+            return new TypeError(result, "Starting value is not an Integer")
+        }
+        this.currentVariableValue = new Integer(this.variable.position, this.variable.line, result.value)
+        this.finish = this.finish.evaluate()
+        if (this.finish instanceof Error){
+            return this.finish
+        }
+        if (!(this.finish instanceof Integer)){
+            return new TypeError(this.finish, "Final value is not an Integer")
+        }
+        this.step = this.step.evaluate()
+        if (this.step instanceof Error){
+            return this.step
+        }
+        if (!(this.step instanceof Integer)){
+            return new TypeError(this.step, "Final value is not an Integer")
+        }
+        if (this.currentVariableValue.value <= this.finish.value && this.step.value > 0){
+            this.increasing = true
+        } else if (this.currentVariableValue.value >= this.finish.value && this.step.value < 0){
+            this.increasing = false
+        } else if (this.step.value == 0){
+            return new EvaluationError(this.step, "Step must have non-zero value")
+        } else {
+            return new EvaluationError(this.step, "Step value must align with bounds of for loop")
+        }
+        this.firstPassComplete = true
     }
 
     evaluate_condition(){
+        //console.log("CALLED", this.position)
         if (this.firstPassComplete){
-            this.variable.assign().set(new Integer(this.variable.position, this.variable.line, this.variable.evaluate().value + this.step.value))
+            //console.log("before", this.position, this.currentVariableValue.value)
+            this.currentVariableValue.value += this.step.value
+            //console.log("after", this.position, this.currentVariableValue.value)
+            this.variable.assign().set(this.currentVariableValue)
         } else {
-            this.firstPassComplete = true
-            this.assignment.evaluate()
-            if (!(this.variable.evaluate() instanceof Integer)){
-                return new TypeError(this.variable.evaluate(), "Starting value is not an Integer")
-            }
-            if (!(this.finish instanceof Integer)){
-                return new TypeError(this.finish, "Final value is not an Integer")
-            }
-            if (!(this.step instanceof Integer)){
-                return new TypeError(this.step, "Step value is not an Integer")
+            let result = this.first_pass()
+            if (result instanceof Error){
+                return result
             }
         }
-        return this.variable.evaluate().value <= this.finish.value ? true : false
+        if (this.increasing){
+            return this.currentVariableValue.value <= this.finish.value
+        }
+        return this.currentVariableValue.value >= this.finish.value
+    }
+
+    reset(){
+        this.firstPassComplete = false
     }
 }
 
@@ -494,7 +544,7 @@ class SyntaxError extends Error {
     }
 }
 
-class MathError extends Error {
+class EvaluationError extends Error {
     constructor(token, description='') {
         super(token.position, token.line)
         this.token = token
@@ -502,7 +552,7 @@ class MathError extends Error {
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nMath Error: ${this.description}\n${this.location()}`
+        return ` ! ERROR @line ${this.line}\nEvaluation Error: ${this.description}\n${this.location()}`
     }
 }
 
@@ -692,8 +742,8 @@ class Lexer {
 class Parser {
     constructor(tokens){
         this.allTokens = tokens // All of the tokens in the program in an 2D array
-        this.line = -1  // THe current index of tokens in the array
-        this.currentTokens = null // The linme of tokens in an array
+        this.line = -1  // The current index of tokens in the array
+        this.currentTokens = null // The corresponding line of tokens in an array
         this.position = -1 // The current position in the line
         this.token = null // The corresponding token for the position
         this.previous = null // The previous token
@@ -722,6 +772,16 @@ class Parser {
             if (this.token instanceof item){
                 return true
             }
+        }
+        return false
+    }
+
+    check_binary_operator(){
+        if (this.token instanceof BinaryOperator){
+            if (this.token instanceof Add || this.token instanceof Minus){
+                return false
+            }
+            return true
         }
         return false
     }
@@ -763,7 +823,7 @@ class Parser {
             return new SyntaxError(this.token, "Needs to follow 'if' statement")
         }
         // Check if the first token is a binary operator
-        if (this.token instanceof BinaryOperator){
+        if (this.check_binary_operator()){
             return new SyntaxError(this.token, "Expected literal")
         }
         // Check if there is a tagged assignment
@@ -809,26 +869,22 @@ class Parser {
             return result
         }
         if (self.check_instance(Add)){ // Add unary operator
-            let errorToken = self.token
             self.continue()
             if (self.token == null){
-                return new SyntaxError(errorToken.position, "Incomplete input")
+                return new SyntaxError(self.previous, "Incomplete input")
             }
             return self.factor(self)
         } 
         if (self.check_instance(Minus)){ // Minus unary operator
-            let errorToken = self.token
             self.continue()
             if (self.token == null){
-                return new SyntaxError(errorToken, "Incomplete input")
+                return new SyntaxError(self.previous, "Incomplete input")
             }
-            let right = self.factor(self)
-            if (right instanceof Error){
-                return right
+            let result = self.factor(self)
+            if (result instanceof Error){
+                return result
             }
-            let result = new Minus(self.position) // Just adds minus node of 0 - value
-            result.left = new Integer(self.position, 0)
-            result.right = right
+            result.value = -result.value
             return result
         } // Two operators in a row
         return new SyntaxError(self.token, "Expected literal")
@@ -860,7 +916,7 @@ class Parser {
             self.continue()
             return result
         }
-        if (self.token instanceof BinaryOperator){
+        if (this.check_binary_operator()){
             return new SyntaxError(self.token, "Expected literal")
         }
         return self.expression(self)
@@ -1046,21 +1102,21 @@ class Parser {
     }
 
     build_do_loop(self){
-        let doToken = self.token
+        let doToken = self.token //do 
         self.continue()
         if (self.token != null){
             return new SyntaxError(this.token, "Expeceted nothing to follow 'do'")
         }
         self.advance_line()
-        while (self.currentTokens != null){
+        while (self.currentTokens != null){ // adding contents
             self.continue()
             if (self.token instanceof TemplateKeyword){
-                if (self.token.tag == "until"){
+                if (self.token.tag == "until"){ // finishing loop
                     self.continue()
                     if (self.token == null){
                         return new SyntaxError(self.previous, "Expected condition after 'until'")
                     }
-                    let condition = self.statement_chain(self)
+                    let condition = self.statement_chain(self) // get condition
                     if (condition instanceof Error){
                         return condition
                     }
@@ -1068,10 +1124,10 @@ class Parser {
                     if (self.token != null){
                         return new SyntaxError(self.token, "Expected no tokens after condition")
                     }
-                    return doToken
+                    return doToken // returned
                 }
             }
-            let result = self.parse()
+            let result = self.parse() // default case
             if (result instanceof Error){
                 return result
             }
@@ -1094,7 +1150,7 @@ class Parser {
         forToken.assignment = result
         forToken.variable = result.left
         if (self.token == null){
-            return new SyntaxError(self.previous, "Expected 'to'")
+            return new SyntaxError(self.previous, "Expected 'to' to follow assignment")
         }
         if (!(self.token instanceof TemplateKeyword)){ // ensures next token is to
             if (self.token.tag != "to"){
@@ -1115,9 +1171,9 @@ class Parser {
             forToken.step = new Integer(self.previous.position, self.previous.line, 1)
         } else {
             if (!(self.token instanceof TemplateKeyword)){ // ensures next token is step
-                if (self.token.tag != "step"){
-                    return new SyntaxError(self.token, "Expected 'step' or end of line")
-                }
+                return new SyntaxError(self.token, "Expected 'step' or end of line")
+            } else if (self.token.tag != "step"){
+                return new SyntaxError(self.token, "Expected 'step' or end of line")
             }
             self.continue()
             if (self.token == null){
@@ -1240,48 +1296,50 @@ class Interpreter {
     evaluate_loop(loop){
         let condition = loop.evaluate_condition()
         if (condition instanceof Error){
-            return condition
+            console.log(condition.display())
+            return 1
         }
         while (condition){
-            if (this.evaluate_asts(loop.evaluate()) == 1){
+            if (this.evaluate_many_asts(loop.evaluate()) == 1){
                 return 1    
             }
             condition = loop.evaluate_condition()
             if (condition instanceof Error){
-                return condition
+                console.log(condition.display())
+                return 1
             }
+        }
+        loop.reset()
+        return 0
+    }
+
+    evaluate_single_ast(ast){
+        if (ast instanceof IfStatement){
+            return this.evaluate_many_asts(ast.evaluate())
+        }
+        if (ast instanceof Loop){
+            return this.evaluate_loop(ast)
+        }
+        if (ast instanceof Error){
+            console.log(ast.display())
+            return 1
+        }
+        if (ast == null){
+            return 0
+        }
+        let evaluated = ast.evaluate()
+        if (evaluated != null){
+            console.log(evaluated.display())
+        } 
+        if (evaluated instanceof Error){
+            return 1
         }
         return 0
     }
 
-    evaluate_asts(asts){
-        if (!Array.isArray(asts)){
-            asts = [asts]
-        }
+    evaluate_many_asts(asts){
         for (let ast of asts){
-            if (ast instanceof IfStatement){
-                return this.evaluate_asts(ast.evaluate())
-            }
-            if (ast instanceof Loop){
-                let result = this.evaluate_loop(ast)
-                if (result instanceof Error){
-                    console.log(result.display())
-                    return 1
-                }
-                continue
-            }
-            if (ast instanceof Error){
-                console.log(ast.display())
-                return 1
-            }
-            if (ast == null){
-                continue
-            }
-            let evaluated = ast.evaluate()
-            if (evaluated != null){
-                console.log(evaluated.display())
-            } 
-            if (evaluated instanceof Error){
+            if (this.evaluate_single_ast(ast) == 1){
                 return 1
             }
         }
@@ -1299,8 +1357,7 @@ class Interpreter {
         let parser = new Parser(this.tokens)
         let ast = parser.parse_next()
         while (ast != null){
-            let result = this.evaluate_asts(ast)
-            if (result == 1){
+            if (this.evaluate_single_ast(ast) == 1){
                 return 1
             }
             ast = parser.parse_next()
@@ -1328,3 +1385,4 @@ main = new Interpreter()
 if (arguments.length > 2){
     main.run_file(commandLineArguments[2])
 }
+
