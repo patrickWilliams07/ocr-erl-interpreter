@@ -142,19 +142,19 @@ class Add extends BinaryOperator{
     }
 
     calculate(){
-        if (this.contains_type(Float) && this.loose_type_check(Float, Integer)){ // Contains at least one float with potential integers
-            return new Float(this.position, this.line, this.get_result()) // Definitely a float return
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
         }
-        if (this.strict_type_check(Integer, Integer)){ // Contains two integers
-            return new Integer(this.position, this.line, this.get_result()) // Definitely an integer return for addition
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
+            return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return for addition
         }
-        if (this.strict_type_check(TextString, TextString)){ // Contains two strings
-            return new TextString(this.position, this.line, this.get_result()) // Concatenation
+        if (this.strict_type_check(StringType, StringType)){ // Contains two strings
+            return new StringType(this.position, this.line, this.get_result()) // Concatenation
         } // ERRORS
-        if (this.leftValue instanceof TextString){ // String + ?
+        if (this.leftValue instanceof StringType){ // String + ?
             return new TypeError(this, `Cannot concatenate type ${this.rightValue.type_to_string()} with String, expected String`)
         } 
-        if (this.leftValue instanceof Integer || this.rightValue instanceof Float){ // Number + ?
+        if (this.leftValue instanceof IntegerType || this.rightValue instanceof FloatType){ // Number + ?
             return new TypeError(this, `Cannot add type ${this.rightValue.type_to_string()} to ${this.leftValue.type_to_string()}, expected Integer or Float`)
         } // ELSE
         return new TypeError(this, `Cannot combine types ${this.leftValue.type_to_string()} and ${this.rightValue.type_to_string()}`)
@@ -169,11 +169,11 @@ class Minus extends BinaryOperator{
     }
     
     calculate(){
-        if (this.contains_type(Float) && this.loose_type_check(Float, Integer)){ // Contains at least one float with potential integers
-            return new Float(this.position, this.line, this.get_result()) // Definitely a float return
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
         }
-        if (this.strict_type_check(Integer, Integer)){ // Contains two integers
-            return new Integer(this.position, this.line, this.get_result()) // Definitely an integer return for addition
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
+            return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return for addition
         } // ERRORS
         return new TypeError(this, `Cannot subtract type ${this.rightValue.type_to_string()} from ${this.leftValue.type_to_string()}, expected Integers or Floats`)
     }
@@ -187,11 +187,11 @@ class Multiply extends BinaryOperator{
     }
     
     calculate(){
-        if (this.contains_type(Float) && this.loose_type_check(Float, Integer)){ // Contains at least one float with potential integers
-            return new Float(this.position, this.line, this.get_result()) // Definitely a float return
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
         }
-        if (this.strict_type_check(Integer, Integer)){ // Contains two integers
-            return new Integer(this.position, this.line, this.get_result()) // Definitely an integer return for addition
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
+            return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return for addition
         } // ERRORS
         return new TypeError(this, `Cannot mutltiply type ${this.leftValue.type_to_string()} with ${this.rightValue.type_to_string()}, expected Integers or Floats`)
     }
@@ -205,17 +205,17 @@ class Divide extends BinaryOperator{
     }
     
     calculate(){
-        if (this.leftValue.value === 0){
+        if (this.rightValue.value === 0){
             return new EvaluationError(this.leftValue, "Cannot divide by zero")
         }
-        if (this.contains_type(Float) && this.loose_type_check(Float, Integer)){ // Contains at least one float with potential integers
-            new Float(this.position, this.line, this.get_result())  // Definitely a float return
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result())  // Definitely a float return
         }
-        if (this.strict_type_check(Integer, Integer)){ // Contains two integers
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             let result = this.get_result() // Must check as can produce a float result
-            return String(result).includes('.') ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
+            return String(result).includes('.') ? new FloatType(this.position, this.line, result) : new IntegerType(this.position, this.line, result)
         } // ERRORS
-        return new TypeError(this, `Cannot divide type ${this.rightValue.type_to_string()} by ${this.leftValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot divide type ${this.rightValue.type_to_string()} by ${this.leftValue.type_to_string()}, expected Integes or Floats`)
     }
 
     get_result = () => this.leftValue.value / this.rightValue.value
@@ -230,17 +230,59 @@ class Exponent extends BinaryOperator{
         if (isNaN(this.get_result())){
             return new EvaluationError(this.leftValue, "Cannot raise a negative number to this power")
         }
-        if (this.contains_type(Float) && this.loose_type_check(Float, Integer)){ // Contains at least one float with potential integers
-            new Float(this.position, this.line, this.get_result())  // Definitely a float return
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result())  // Definitely a float return
         }
-        if (this.strict_type_check(Integer, Integer)){ // Contains two integers
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             let result = this.get_result() // Must check as can produce a float result
-            return String(result).includes('.') ? new Float(this.position, this.line, result) : new Integer(this.position, this.line, result)
+            return String(result).includes('.') ? new FloatType(this.position, this.line, result) : new IntegerType(this.position, this.line, result)
         } // ERRORS
         return new TypeError(this, `Cannot divide type ${this.rightValue.type_to_string()} by ${this.leftValue.type_to_string()}, expected Integers or Floats`)
     }
 
     get_result = () => this.leftValue.value ** this.rightValue.value
+}
+
+class Modulus extends BinaryOperator{
+    constructor(position, line){
+        super(position, line)
+    }
+    
+    calculate(){
+        if (this.rightValue.value === 0){
+            return new EvaluationError(this.leftValue, "Cannot take moduluo by zero")
+        }
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
+        }
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
+            return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return
+        } // ERRORS
+        return new TypeError(this, `Cannot take modulus of type ${this.leftValue.type_to_string()} modulo ${this.rightValue.type_to_string()}, expected Integers or Floats`)
+    }
+
+    get_result = () => this.leftValue.value % this.rightValue.value
+}
+
+class Quotient extends BinaryOperator{
+    constructor(position, line){
+        super(position, line)
+    }
+    
+    calculate(){
+        if (this.rightValue.value === 0){
+            return new EvaluationError(this.leftValue, "Cannot do quotient division by zero")
+        }
+        if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
+            return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
+        }
+        if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
+            return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return
+        } // ERRORS
+        return new TypeError(this, `Cannot take the quotient of type ${this.leftValue.type_to_string()} and ${this.rightValue.type_to_string()}, expected Integers or Floats`)
+    }
+
+    get_result = () => Math.floor(this.leftValue.value / this.rightValue.value)
 }
 
 ////////////////
@@ -275,8 +317,8 @@ class And extends BinaryOperator{
     }
 
     calculate(){
-        if (this.strict_type_check(Boolean, Boolean)){ // Contains two Booleans
-            return new Boolean(this.position, this.line, this.get_result()) // Expected result
+        if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
+            return new BooleanType(this.position, this.line, this.get_result()) // Expected result
         } // ERRORS
         return new TypeError(this, `Cannot use AND on type ${this.rightValue.type_to_string()} with ${this.leftValue.type_to_string()}, expected Booleans`)
     }
@@ -290,8 +332,8 @@ class Or extends BinaryOperator{
     }
 
     calculate(){
-        if (this.strict_type_check(Boolean, Boolean)){ // Contains two Booleans
-            return new Boolean(this.position, this.line, this.get_result()) // Expected result
+        if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
+            return new BooleanType(this.position, this.line, this.get_result()) // Expected result
         } // ERRORS
         return new TypeError(this, `Cannot use OR on type ${this.rightValue.type_to_string()} with ${this.leftValue.type_to_string()}, expected Booleans`)
     }
@@ -299,19 +341,37 @@ class Or extends BinaryOperator{
     get_result = () => this.leftValue.value || this.rightValue.value
 }
 
-class LogicalOperator extends BinaryOperator{
+class Not extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.child = null
+    }
+
+    evaluate(){
+        let childValue = this.child.evaluate()
+        if (childValue instanceof Error){
+            return childValue
+        }
+        if (childValue instanceof BooleanType){
+            return new BooleanType(this.position, this.line, !childValue.value)
+        }
+        return new TypeError(this, `Cannot use NOT on type ${childValue.type_to_string()}, expected Boolean`)
+    }
+}
+
+class ComparisonOperator extends BinaryOperator{
     constructor(position, line, tag){
         super(position, line)
         this.tag = tag
     }
 
     calculate(){
-        if (this.loose_type_check(Integer, Float) || this.strict_type_check(TextString, TextString)){ // Contains two Booleans
-            return new Boolean(this.position, this.line, this.get_result()) // Expected result
+        if (this.loose_type_check(IntegerType, FloatType) || this.strict_type_check(StringType, StringType)){ // Contains two Booleans
+            return new BooleanType(this.position, this.line, this.get_result()) // Expected result
         }
-        if (this.strict_type_check(Boolean, Boolean)){
+        if (this.strict_type_check(BooleanType, BooleanType)){
             if (this.tag == "==" || this.tag == "!="){
-                return new Boolean(this.position, this.line, this.get_result())
+                return new BooleanType(this.position, this.line, this.get_result())
             }
             return new TypeError(this, `Cannot compare two Booleans with comparator '${this.tag}', only '==' or '!='`)
         }
@@ -352,7 +412,7 @@ class DataType extends Token{
     }
 }
 
-class Integer extends DataType{
+class IntegerType extends DataType{
     constructor(position, line, value){
         super(position, line, value)
     }
@@ -362,9 +422,22 @@ class Integer extends DataType{
     }
 
     type_to_string = () => "Integer"
+
+    cast_to_type(type){ // FROM INTEGERS
+        switch (type){
+            case IntegerType:
+                return this
+            case FloatType:
+                return new FloatType(this.position, this.line, this.value)
+            case BooleanType: // true when not 0, false when 0
+                return new BooleanType(this.position, this.line, this.value != 0)
+            case StringType:
+                return new StringType(this.position, this.line, this.display())
+        }
+    }
 }
 
-class Float extends DataType{
+class FloatType extends DataType{
     constructor(position, line, value){
         super(position, line, value)
     }
@@ -377,9 +450,22 @@ class Float extends DataType{
     }
     
     type_to_string = () => "Float"
+
+    cast_to_type(type){ // FROM FLOAT
+        switch (type){
+            case IntegerType:
+                return new IntegerType(this.position, this.line, Math.floor(this.value))
+            case FloatType:
+                return this
+            case BooleanType: // true when not 0, false when 0
+                return new BooleanType(this.position, this.line, this.value != 0)
+            case StringType:
+                return new StringType(this.position, this.line, this.display())
+        }
+    }
 }
 
-class Boolean extends DataType{
+class BooleanType extends DataType{
     constructor(position, line, value){
         super(position, line, value)
     }
@@ -389,9 +475,21 @@ class Boolean extends DataType{
     }
 
     type_to_string = () => "Boolean"
+
+    cast_to_type(type){ // FROM BOOLEAN
+        switch (type){
+            case IntegerType:
+            case FloatType: // 1 when true, 0 when false
+                return new type(this.position, this.line, this.value ? 1 : 0)
+            case BooleanType:
+                return this
+            case StringType:
+                return new StringType(this.position, this.line, this.display())
+        }
+    }
 }
 
-class TextString extends DataType{
+class StringType extends DataType{
     constructor(position, line, value){
         super(position, line, value)
     }
@@ -401,6 +499,32 @@ class TextString extends DataType{
     }
 
     type_to_string = () => "String"
+
+    cast_to_type(type){ // FROM STRING
+        switch (type){
+            case IntegerType: // Can be converted to a number, no full stops
+                if (isNaN(Number(this.value)) || this.value.includes('.')){
+                    return new TypeError(this, `Cannot cast ${this.value} to type Integer`)
+                }
+                return new IntegerType(this.position, this.line, Number(this.value))
+            case FloatType: // Can be converted to a number
+                if (isNaN(Number(this.value))){
+                    return new TypeError(this, `Cannot cast ${this.value} to type Float`)
+                }
+                return new FloatType(this.position, this.line, Number(this.value))
+            case BooleanType: // "True" or "False" are accepted, rest are errors
+                switch (this.value){
+                    case "True":
+                        return new BooleanType(this.position, this.line, true)
+                    case "False":
+                        return new BooleanType(this.position, this.line, false)
+                    default:
+                        return new TypeError(this, `Cannot cast ${this.value} to type Float, expected "True" or "False"`)
+                }
+            case StringType:
+                return this
+        }
+    }
 }
 
 ////////////////
@@ -460,7 +584,7 @@ class IfStatement extends Token{
             if (result instanceof Error){
                 return result
             }
-            if (!(result instanceof Boolean)){
+            if (!(result instanceof BooleanType)){
                 return new TypeError(result, `Condition must be type Boolean, not ${result.type_to_string()}`)
             }
             if (result.value === true){
@@ -515,7 +639,7 @@ class While extends Loop{
         if (condition instanceof Error){
             return condition
         }
-        if (!(condition instanceof Boolean)){
+        if (!(condition instanceof BooleanType)){
             return new TypeError(condition, `Condition must be type Boolean, not ${condition.type_to_string()}`)
         }
         return condition.value
@@ -540,7 +664,7 @@ class Do extends Loop{
         if (condition instanceof Error){
             return condition
         }
-        if (!(condition instanceof Boolean)){
+        if (!(condition instanceof BooleanType)){
             return new TypeError(condition, `Condition must be type Boolean, not ${condition.type_to_string()}`)
         }
         return !condition.value
@@ -571,22 +695,22 @@ class For extends Loop{
             return assignment
         }
         let result = this.variable.evaluate()
-        if (!(result instanceof Integer)){
+        if (!(result instanceof IntegerType)){
             return new TypeError(result, "Starting value is not an Integer")
         }
-        this.variableValue = new Integer(this.variable.position, this.variable.line, result.value)
+        this.variableValue = new IntegerType(this.variable.position, this.variable.line, result.value)
         this.finishValue = this.finish.evaluate()
         if (this.finishValue instanceof Error){
             return this.finishValue
         }
-        if (!(this.finishValue instanceof Integer)){
+        if (!(this.finishValue instanceof IntegerType)){
             return new TypeError(this.finishValue, "Final value is not an Integer")
         }
         this.stepValue = this.step.evaluate()
         if (this.stepValue instanceof Error){
             return this.stepValue
         }
-        if (!(this.stepValue instanceof Integer)){
+        if (!(this.stepValue instanceof IntegerType)){
             return new TypeError(this.stepValue, "Final value is not an Integer")
         }
         if (this.variableValue.value <= this.finishValue.value && this.stepValue.value > 0){
@@ -602,22 +726,22 @@ class For extends Loop{
     }
 
     evaluate_condition(){
-        //console.log("CALLED", this.position)
-        if (this.firstPassComplete){
-            //console.log("before", this.position, this.currentVariableValue.value)
-            this.variableValue.value += this.stepValue.value
-            //console.log("after", this.position, this.currentVariableValue.value)
-            this.variable.assign().set(this.variableValue)
+        let newValue
+        if (this.firstPassComplete){ //increasing value
+            newValue = this.variableValue.value + this.stepValue.value
         } else {
             let result = this.first_pass()
             if (result instanceof Error){
                 return result
             }
+            newValue = this.variableValue.value
         }
-        if (this.increasing){
-            return this.variableValue.value <= this.finishValue.value
+        let condition = this.increasing ? newValue <= this.finishValue.value : newValue >= this.finishValue.value
+        if (condition){ // only change identifier if another loop will occur
+            this.variableValue.value = newValue
+            this.variable.assign().set(this.variableValue)
         }
-        return this.variableValue.value >= this.finishValue.value
+        return condition
     }
 
     reset(){
@@ -639,17 +763,21 @@ class Error {
     location(){
         return `${this.text}\n${' '.repeat(this.position)}^`
     }
-}
-
-class UnexpectedCharacterError extends Error {
-    constructor(position, line, character) {
-        super(position, line)
-        this.character = character
-    }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nUnexpected Character: '${this.character}'\n${this.location()}`
+        return "error"
     }
+}
+
+class LexicalError extends Error {
+    constructor(position, line, description='') {
+        super(position, line)
+        this.description = description
+    }
+
+    // display(){
+    //     return ` ! ERROR @line ${this.line}\nLexical Error: ${this.description}\n${this.location()}`
+    // }
 }
 
 class SyntaxError extends Error {
@@ -659,9 +787,9 @@ class SyntaxError extends Error {
         this.description = description
     }
 
-    display(){
-        return ` ! ERROR @line ${this.line}\nInvalid Syntax: ${this.description}\n${this.location()}`
-    }
+    // display(){
+    //     return ` ! ERROR @line ${this.line}\nInvalid Syntax: ${this.description}\n${this.location()}`
+    // }
 }
 
 class EvaluationError extends Error {
@@ -671,9 +799,9 @@ class EvaluationError extends Error {
         this.description = description
     }
 
-    display(){
-        return ` ! ERROR @line ${this.line}\nEvaluation Error: ${this.description}\n${this.location()}`
-    }
+    // display(){
+    //     return ` ! ERROR @line ${this.line}\nEvaluation Error: ${this.description}\n${this.location()}`
+    // }
 }
 
 class IdentifierError extends Error{
@@ -683,9 +811,9 @@ class IdentifierError extends Error{
         this.description = description
     }
 
-    display(){
-        return ` ! ERROR @line ${this.line}\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
-    }
+    // display(){
+    //     return ` ! ERROR @line ${this.line}\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
+    // }
 }
 
 class TypeError extends Error{
@@ -695,9 +823,9 @@ class TypeError extends Error{
         this.description = description
     }
 
-    display(){
-        return ` ! ERROR @line ${this.line}\nType Error: ${this.description}\n${this.location()}`
-    }
+    // display(){
+    //     return ` ! ERROR @line ${this.line}\nType Error: ${this.description}\n${this.location()}`
+    // }
 }
 
 ////////////////
@@ -756,7 +884,11 @@ class Lexer {
                 tokens.push(this.make_identifier())
                 continue
             } else if (this.character == '"' || this.character == "'"){
-                tokens.push(this.make_string())
+                let string = this.make_string()
+                if (string instanceof Error){
+                    return string
+                }
+                tokens.push(string)
             } else if (this.character == '+') {
                 tokens.push(new Add(this.position, this.line))
             } else if (this.character == '-') {
@@ -780,7 +912,7 @@ class Lexer {
             } else if (this.character == ')') {
                 tokens.push(new RightBracket(this.position, this.line))
             } else { // Not recognised
-                return new UnexpectedCharacterError(this.position, this.line, this.character)
+                return new LexicalError(this.position, this.line, `Unexpected character '${this.character}'`)
             }
             this.continue()
         }
@@ -796,12 +928,12 @@ class Lexer {
             if (this.character == '.'){
                 fullStops += 1
                 if (fullStops == 2){
-                    return new UnexpectedCharacterError(this.position, '.')
+                    return new LexicalError(this.position, this.line, "Only expected one '.' to create Float")
                 }
             }
             this.continue()
         }
-        return fullStops == 0 ? new Integer(position, this.line, Number(number.join(''))) : new Float(position, this.line, Number(number.join('')))
+        return fullStops == 0 ? new IntegerType(position, this.line, Number(number.join(''))) : new FloatType(position, this.line, Number(number.join('')))
     }
 
     make_identifier(){
@@ -813,14 +945,20 @@ class Lexer {
         }
         name = name.join('')
         switch (name) {
+            case "MOD":
+                return new Modulus(position, this.line)
+            case "DIV":
+                return new Quotient(position, this.line)
             case "True":
-                return new Boolean(position, this.line, true)
+                return new BooleanType(position, this.line, true)
             case "False":
-                return new Boolean(position, this.line, false)
+                return new BooleanType(position, this.line, false)
             case "AND":
                 return new And(position, this.line)
             case "OR":
                 return new Or(position, this.line)
+            case "NOT":
+                return new Not(position, this.line)
             case "if":
                 return new IfStatement(position, this.line)
             case "elseif":
@@ -852,15 +990,15 @@ class Lexer {
         this.continue()
         if (this.character == '='){
             this.continue()
-            return new LogicalOperator(this.position-2, this.line, initialCharacter+'=')
+            return new ComparisonOperator(this.position-2, this.line, initialCharacter+'=')
         }
         switch (initialCharacter){
             case '=':
                 return new Equals(this.position-1, this.line)
             case '!':
-                return new UnexpectedCharacterError(this.position-1, this.line, initialCharacter)
+                return new LexicalError(this.position-1, this.line, "Unexpected character '!'")
             default:
-                return new LogicalOperator(this.position-1, this.line, initialCharacter)
+                return new ComparisonOperator(this.position-1, this.line, initialCharacter)
         }
     }
 
@@ -869,11 +1007,11 @@ class Lexer {
         let position = this.position
         let quotationMark = this.character
         this.continue()
-        while (this.character != quotationMark){
+        while (this.character != quotationMark && this.character != null){
             string.push(this.character)
             this.continue()
         }
-        return new TextString(position, this.line, string.join(''))
+        return this.character == null ? new LexicalError(position, this.line, "Unclosed string") :new StringType(position, this.line, string.join(''))
     }
 }
 
@@ -1006,9 +1144,8 @@ class Parser {
             self.continue()
             return result
         }
-        let result = self.parse_brackets(self, LeftBracket, RightBracket, self.expression)
-        if (result != null){
-            return result
+        if (self.token instanceof LeftBracket){
+            return self.parse_brackets(self, RightBracket, self.statement_chain)
         }
         if (self.check_instance(Add)){ // Add unary operator
             self.continue()
@@ -1037,60 +1174,61 @@ class Parser {
     }
 
     term(self){
-        return self.parse_binary_operator(self, self.exponent, [Multiply, Divide])
+        return self.parse_binary_operator(self, self.exponent, [Multiply, Divide, Modulus, Quotient])
     }
 
     expression(self){
         let result = self.parse_binary_operator(self, self.term, [Add, Minus])
-        if (self.check_instance(Integer, Float, Identifier)){
+        if (self.check_instance(IntegerType, FloatType, Identifier)){
             return new SyntaxError(self.token, "Expected operator")
         }
         return result
     }
 
-    half_statement(self){
-        let bracketCheck = self.parse_brackets(self, LeftBracket, RightBracket, self.statement_chain)
-        if (bracketCheck != null){
-            return bracketCheck
-        }
-        if (self.token instanceof Boolean){
-            let result = self.token
-            self.continue()
-            return result
-        }
-        if (this.check_binary_operator()){
+    statement(self){
+        if (this.check_binary_operator()){ // starts with binary operator
             return new SyntaxError(self.token, "Expected literal")
         }
-        return self.expression(self)
-    }
-
-    statement(self){
-        let left = self.half_statement(self)
-        if (left instanceof Error || self.token == null){ // Check if just a normal expression and not a statement
-            return left
+        let left = self.expression(self) //left hand side
+        if (left instanceof Error || !(self.token instanceof ComparisonOperator)){ 
+            return left // returns if error or next is not comparison
         }
-        let result = self.token
-        if (!(result instanceof LogicalOperator)){ // Middle
-            if (self.check_result(result)){
-                return result
-            }
-            return left
-        }
+        let result = self.token // middle
         self.continue()
-        if (self.token == null){
+        if (self.token == null){ // nothing after comparison
             return new SyntaxError(result, "Incomplete input")
         }
-        let right = self.half_statement(self)
+        if (this.check_binary_operator()){ // starts with binary operator
+            return new SyntaxError(self.token, "Expected literal")
+        }
+        let right = self.expression(self) //right hand side
         if (right instanceof Error){
             return right
         }
         result.left = left
         result.right = right
-        return result
+        return result // returns comparison
+    }
+
+    not_statement(self){
+        if (self.token instanceof Not){
+            let notToken = self.token
+            self.continue()
+            if (self.token == null){
+                return new SyntaxError(self.previous, "Incomplete input")
+            }
+            let result = self.not_statement(self)
+            if (result instanceof Error){
+                return result
+            }
+            notToken.child = result
+            return notToken
+        }
+        return self.statement(self)
     }
 
     statement_chain(self){
-        return self.parse_binary_operator(self, self.statement, [And, Or])
+        return self.parse_binary_operator(self, self.not_statement, [And, Or])
     }
 
     assignment(self){
@@ -1285,6 +1423,9 @@ class Parser {
         if (self.token == null){ // ensures tokena fter for
             return new SyntaxError(forToken, "Expected assignment after 'for'")
         }
+        if (self.token instanceof TemplateKeyword){
+            return new SyntaxError(self.token, "Expected identifier")
+        }
         let result = self.assignment(self) //assignment
         if (result instanceof Error){
             return result
@@ -1309,7 +1450,7 @@ class Parser {
         }
         forToken.finish = result
         if (self.token == null){ // no step keyword
-            forToken.step = new Integer(self.previous.position, self.previous.line, 1)
+            forToken.step = new IntegerType(self.previous.position, self.previous.line, 1)
         } else {
             if (!(self.token instanceof TemplateKeyword)){ // ensures next token is step
                 return new SyntaxError(self.token, "Expected 'step' or end of line")
@@ -1384,21 +1525,21 @@ class Parser {
         return result
     }
 
-    parse_brackets(self, start, end, nextFunction){
+    parse_brackets(self, end, nextFunction){
         let bracket = self.token
-        if (bracket instanceof start){
-            self.continue()
-            let result = nextFunction(self)
-            if (result instanceof Error){
-                return result
-            }
-            if (self.token instanceof end){
-                self.continue()
-                return result
-            }
-            return new SyntaxError(bracket, "'(' was never closed")
+        self.continue()
+        if (self.token instanceof end){
+            return new SyntaxError(bracket, "'()' was empty")
         }
-        return null
+        let result = nextFunction(self)
+        if (result instanceof Error){
+            return result
+        }
+        if (self.token instanceof end){
+            self.continue()
+            return result
+        }
+        return new SyntaxError(bracket, "'(' was never closed")
     }
 }
 
@@ -1441,7 +1582,7 @@ class Interpreter {
     evaluate_loop(loop){
         let condition = loop.evaluate_condition()
         if (condition instanceof Error){
-            console.log(condition.display())
+            output.push(condition.display())
             return 1
         }
         while (condition){
@@ -1450,7 +1591,7 @@ class Interpreter {
             }
             condition = loop.evaluate_condition()
             if (condition instanceof Error){
-                console.log(condition.display())
+                output.push(condition.display())
                 return 1
             }
         }
@@ -1462,7 +1603,7 @@ class Interpreter {
         if (ast instanceof IfStatement){
             let result = ast.evaluate()
             if (result instanceof Error){
-                console.log(result.display())
+                output.push(result.display())
                 return 1
             }
             return this.evaluate_many_asts(result)
@@ -1471,7 +1612,7 @@ class Interpreter {
             return this.evaluate_loop(ast)
         }
         if (ast instanceof Error){
-            console.log(ast.display())
+            output.push(ast.display())
             return 1
         }
         if (ast == null){
@@ -1479,7 +1620,7 @@ class Interpreter {
         }
         let evaluated = ast.evaluate()
         if (evaluated != null){
-            console.log(evaluated.display())
+            output.push(evaluated.display())
         } 
         if (evaluated instanceof Error){
             return 1
@@ -1503,7 +1644,7 @@ class Interpreter {
         if (!this.have_tokens){
             let result = this.make_tokens()
             if (result instanceof Error){
-                console.log(result.display())
+                output.push(result.display())
                 return 1
             }
         }
@@ -1529,7 +1670,7 @@ class Interpreter {
     run_file(fileName){
         this.get_plaintext_from_file(fileName)
         let code = this.run()
-        console.log(`\nExited with code ${code}`)
+        output.push(`\nExited with code ${code}`)
     }
 }
 
@@ -1537,8 +1678,23 @@ class Interpreter {
 // MAIN
 ////////////////
 
-let commandLineArguments = process.argv
-main = new Interpreter()
-if (arguments.length > 2){
-    main.run_file(commandLineArguments[2])
+function main(){
+    let testCases = fs.readFileSync("testCases.txt", 'utf8').split("\n$\n")
+    let interpeter = new Interpreter()
+    let success = 0
+    for (let i = 0; i < testCases.length; i+= 2) {
+        output = []
+        interpeter.set_plaintext_manually(testCases[i])
+        interpeter.run()
+        if (output.join("\n") == testCases[i+1]){
+            success++
+        } else {
+            console.log(`FAILURE\n${testCases[i]}\nGOT ${output}\nEXPECTED ${testCases[i+1].split("\n")}\n\n`)
+        }
+        global.table = []
+    }
+    console.log(`Success: ${success}/${testCases.length/2} = ${success/testCases.length*200}%`)
 }
+
+main()
+ 
