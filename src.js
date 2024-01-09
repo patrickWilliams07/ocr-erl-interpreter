@@ -63,7 +63,6 @@ const prompt = require('prompt-sync')()
 const fs = require('fs')
 const DIGITS = [..."0123456789"]
 const LETTERS = [..."qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM"]
-let global = new SymbolTable()
 let currentText = []
 
 ////////////////
@@ -137,10 +136,6 @@ class BinaryOperator extends Token{
 }
 
 class Add extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-
     calculate(){
         if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
             return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
@@ -164,10 +159,6 @@ class Add extends BinaryOperator{
 }
 
 class Minus extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-    
     calculate(){
         if (this.contains_type(FloatType) && this.loose_type_check(FloatType, IntegerType)){ // Contains at least one float with potential integers
             return new FloatType(this.position, this.line, this.get_result()) // Definitely a float return
@@ -200,12 +191,7 @@ class Multiply extends BinaryOperator{
 }
 
 class Divide extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-    
     calculate(){
-        console.log(this.contains_type(FloatType), this.loose_type_check(FloatType, IntegerType))
         if (this.rightValue.value === 0){
             return new EvaluationError(this.leftValue, "Cannot divide by zero")
         }
@@ -223,10 +209,6 @@ class Divide extends BinaryOperator{
 }
 
 class Exponent extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-    
     calculate(){
         if (isNaN(this.get_result())){
             return new EvaluationError(this.leftValue, "Cannot raise a negative number to this power")
@@ -245,10 +227,6 @@ class Exponent extends BinaryOperator{
 }
 
 class Modulus extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-    
     calculate(){
         if (this.rightValue.value === 0){
             return new EvaluationError(this.leftValue, "Cannot take moduluo by zero")
@@ -266,10 +244,6 @@ class Modulus extends BinaryOperator{
 }
 
 class Quotient extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-    
     calculate(){
         if (this.rightValue.value === 0){
             return new EvaluationError(this.leftValue, "Cannot do quotient division by zero")
@@ -291,10 +265,6 @@ class Quotient extends BinaryOperator{
 ////////////////
 
 class Equals extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-
     evaluate(){
         this.leftValue = this.left.assign()
         this.rightValue = this.right.evaluate()
@@ -313,10 +283,6 @@ class Equals extends BinaryOperator{
 ////////////////
 
 class And extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-
     calculate(){
         if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
             return new BooleanType(this.position, this.line, this.get_result()) // Expected result
@@ -328,10 +294,6 @@ class And extends BinaryOperator{
 }
 
 class Or extends BinaryOperator{
-    constructor(position, line){
-        super(position, line)
-    }
-
     calculate(){
         if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
             return new BooleanType(this.position, this.line, this.get_result()) // Expected result
@@ -411,13 +373,13 @@ class DataType extends Token{
     evaluate() {
         return this
     }
+
+    call(){
+        return new EvaluationError(self, `Type ${this.type_to_string()} cannot be called`)
+    }
 }
 
 class IntegerType extends DataType{
-    constructor(position, line, value){
-        super(position, line, value)
-    }
-
     display(){
         return String(this.value)
     }
@@ -439,10 +401,6 @@ class IntegerType extends DataType{
 }
 
 class FloatType extends DataType{
-    constructor(position, line, value){
-        super(position, line, value)
-    }
-
     display(){
         if (String(this.value).includes('.')){
             return String(this.value)
@@ -467,10 +425,6 @@ class FloatType extends DataType{
 }
 
 class BooleanType extends DataType{
-    constructor(position, line, value){
-        super(position, line, value)
-    }
-
     display(){
         return this.value ? "True" : "False"
     }
@@ -491,10 +445,6 @@ class BooleanType extends DataType{
 }
 
 class StringType extends DataType{
-    constructor(position, line, value){
-        super(position, line, value)
-    }
-
     display(){
         return this.value
     }
@@ -529,34 +479,85 @@ class StringType extends DataType{
 }
 
 ////////////////
-// MISCELLANEOUS
+// VARIABLES AND FUNCITONS
 ////////////////
 
-class LeftBracket extends Token{
-    constructor(position, line){
-        super(position, line)
-    }
-}
-
-class RightBracket extends Token{
-    constructor(position, line){
-        super(position, line)
-    }
-}
-
 class Identifier extends Token{
-    constructor(position, line, name, constant=false){
+    constructor(position, line, name){
         super(position, line)
         this.name = name
-        this.constant = constant
+        this.constant = false
+        this.global = false
     }
 
     evaluate(){
-        return global.find(this).value
+        return (this.global ? Evaluator.global : Evaluator.currentScope).find(this).value
     }
 
     assign(){
-        return global.find(this)
+        return (this.global ? Evaluator.global : Evaluator.currentScope).find(this)
+    }
+}
+
+class Call extends Token{
+    constructor(position, line){
+        super(position, line)
+        this.callee = null
+        this.argumentsAsts = []
+    }
+
+    evaluate(){
+        return this.callee.evaluate().call(this.argumentsAsts)
+    }
+}
+
+class Subroutine extends Token{
+    constructor(position, line, tag){
+        super(position, line)
+        this.tag = tag
+        this.parameters = []
+        this.contents = []
+        this.identifier = null
+    }
+
+    call(argumentsAsts){
+        let previousScope = Evaluator.currentScope
+        Evaluator.currentScope = new SymbolTable()
+        if (this.parameters.length != argumentsAsts.length){
+            return new EvaluationError(call, `Subroutine expected ${this.parameters.length} arguments, ${call.argumentsAsts.length} given`)
+        }
+        for (let i = 0; i < this.parameters.length; i++){
+            let result = argumentsAsts[i].evaluate()
+            if (result instanceof Error){
+                return result
+            }
+            this.parameters[i].assign().set(result)
+        }
+        let result = new Evaluator().evaluate_many_asts(this.contents)
+        if (result instanceof Error){
+            return result
+        }
+        let returnValue = null
+        if (result instanceof Return){
+            returnValue = result.child.evaluate()
+        }
+        Evaluator.currentScope = previousScope
+        return returnValue
+    }
+
+    evaluate(){
+        this.identifier.assign().set(this)
+    }
+}
+
+class Return extends Token {
+    constructor(position, line){
+        super(position, line)
+        this.child = null
+    }
+
+    evaluate(){
+        return this.child.evaluate()
     }
 }
 
@@ -904,10 +905,8 @@ class Lexer {
             } else if (['=','<','>','!'].includes(this.character)){
                 tokens.push(this.make_logical_operator())
                 continue
-            } else if (this.character == '(') {
-                tokens.push(new LeftBracket(this.position, this.line))
-            } else if (this.character == ')') {
-                tokens.push(new RightBracket(this.position, this.line))
+            } else if (['(', ')',','].includes(this.character)){
+                tokens.push(new TemplateKeyword(this.position, this.line, this.character))
             } else { // Not recognised
                 return new LexicalError(this.position, this.line, `Unexpected character '${this.character}'`)
             }
@@ -968,7 +967,13 @@ class Lexer {
                 return new Do(position, this.line)
             case "for":
                 return new For(position, this.line)
+            case "procedure":
+            case "function":
+                return new Subroutine(position, this.line, name)
+            case "return":
+                return new Return(position, this.line)
             case "const":
+            case "global":
             case "then":
             case "endif":
             case "endwhile":
@@ -976,6 +981,8 @@ class Lexer {
             case "to":
             case "step":
             case "next":
+            case "endprocedure":
+            case "endfunction":
                 return new TemplateKeyword(position, this.line, name)
             default:
                 return new Identifier(position, this.line, name)
@@ -1017,13 +1024,14 @@ class Lexer {
 ////////////////
 
 class Parser {
-    constructor(tokens){
+    constructor(tokens, global){
         this.allTokens = tokens // All of the tokens in the program in an 2D array
         this.line = -1  // The current index of tokens in the array
         this.currentTokens = null // The corresponding line of tokens in an array
         this.position = -1 // The current position in the line
         this.token = null // The corresponding token for the position
         this.previous = null // The previous token
+        this.allowReturn = false // Depends if a function is currently being parsed
     }
 
     advance_line(){
@@ -1047,6 +1055,18 @@ class Parser {
     check_instance() {
         for (let item of arguments){
             if (this.token instanceof item){
+                return true
+            }
+        }
+        return false
+    }
+
+    check_tag(){
+        if (!(this.token instanceof TemplateKeyword)){
+            return false
+        }
+        for (let item of arguments){
+            if (this.token.tag == item){
                 return true
             }
         }
@@ -1090,6 +1110,17 @@ class Parser {
         if (this.token instanceof For){
             return this.build_for_loop(this)
         }
+        // Checks for a subroutine definition
+        if (this.token instanceof Subroutine){
+            return this.build_subroutine(this)
+        }
+        // Check if it is a return statement
+        if (this.token instanceof Return) {
+            if (this.allowReturn){
+                return this.return(this)
+            }
+            return new SyntaxError(this.token, "Can only use 'return' within functions")
+        }
         // Checks if an if statement is being built
         if (this.token instanceof IfStatement){
             let result = this.build_if_chain(this)
@@ -1103,15 +1134,14 @@ class Parser {
         if (this.check_binary_operator()){
             return new SyntaxError(this.token, "Expected literal")
         }
-        // Check if there is a tagged assignment
-        if (this.token instanceof TemplateKeyword){
-            switch(this.token.tag){
-                case "const": // Constant
-                    let result = this.assignment(this)
-                    return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
-                case "endif": // Endif without if statement
-                    return new SyntaxError(this.token, "Needs to follow 'if' statement")
-            }
+        // Check if there is a tagged variable assignment
+        if (this.check_tag("const", "global")){
+            let result = this.assignment(this)
+            return this.check_result(result) ? result : new SyntaxError(this.token, "Expected operator")
+        }
+        // Check if elseif or endif is used not at end of line
+        if (this.check_tag("endif", "elseif")){
+            return new SyntaxError(this.token, "Needs to follow 'if' statement")
         }
         // Check if it is a normal assignment
         if (this.token instanceof Identifier){
@@ -1135,35 +1165,68 @@ class Parser {
         return false
     }
 
+    call(self){
+        let call = new Call(self.token.position, self.token.line)
+        self.continue()
+        if (self.check_tag(')')){
+            self.continue()
+            return call
+        }
+        let argument = self.statement_chain(self)
+        if (argument instanceof Error){
+            return argument
+        }
+        call.argumentsAsts.push(argument)
+        while (self.check_tag(',')){
+            self.continue()
+            argument = self.statement_chain(self)
+            if (argument instanceof Error){
+                return argument
+            }
+            call.argumentsAsts.push(argument)
+        }
+        if (self.check_tag(')')){
+            self.continue()
+            return call
+        }
+        return new SyntaxError(self.token, "Expected ')' or ',' followed by additional argument")
+    }
+
     factor(self){
+        let result
         if (self.check_instance(DataType, Identifier)){
-            let result = self.token
+            result = self.token
             self.continue()
-            return result
-        }
-        if (self.token instanceof LeftBracket){
-            return self.parse_brackets(self, RightBracket, self.statement_chain)
-        }
-        if (self.check_instance(Add)){ // Add unary operator
+        } else if (self.check_tag('(')){
+            result = self.parse_brackets(self, ')', self.statement_chain)
+        } else if (self.check_instance(Add)){ // Add unary operator
             self.continue()
             if (self.token == null){
                 return new SyntaxError(self.previous, "Incomplete input")
             }
-            return self.factor(self)
-        } 
-        if (self.check_instance(Minus)){ // Minus unary operator
+            result = self.factor(self)
+        } else if (self.check_instance(Minus)){ // Minus unary operator
             self.continue()
             if (self.token == null){
                 return new SyntaxError(self.previous, "Incomplete input")
             }
-            let result = self.factor(self)
+            result = self.factor(self)
             if (result instanceof Error){
                 return result
             }
             result.value = -result.value
-            return result
-        } // Two operators in a row
-        return new SyntaxError(self.token, "Expected literal")
+        } else { // Two operators in a row
+            return new SyntaxError(self.token, "Expected literal")
+        }
+        while (self.check_tag('(')){
+            let call = self.call(self)
+            if (call instanceof Error){
+                return call
+            }
+            call.callee = result
+            result = call
+        }
+        return result
     }
 
     exponent(self){
@@ -1230,19 +1293,16 @@ class Parser {
 
     assignment(self){
         let tag = null
-        if (self.token instanceof TemplateKeyword){
-            if (self.token.tag == "const"){
-                tag = "const"
-                self.continue()
-            }
+        if (self.check_tag("const", "global")){
+            tag = self.token.tag
+            self.continue()
         }
         let variable = self.token
         if (!(variable instanceof Identifier)){
             return new SyntaxError(variable, "Expected identifier")
         }
-        if (tag == "const"){
-            variable = new Identifier(variable.position, variable.line, variable.name, true)
-        }
+        variable.constant = tag == "const"
+        variable.global = tag == "global"
         self.continue()
         let equals = self.token
         if (equals == null){
@@ -1272,15 +1332,13 @@ class Parser {
         if (result instanceof Error){
             return result
         }
-        if (self.token instanceof TemplateKeyword){
-            if (self.token.tag == "then"){ // Checks if line finishes witt then
-                ifToken.condition = result
-                self.continue()
-                if (self.token == null){
-                    return ifToken
-                }
-                return new SyntaxError(self.token, "Unexpected token after 'then'") // Tokens after then
+        if (self.check_tag("then")){ // Checks if line finishes with then
+            ifToken.condition = result
+            self.continue()
+            if (self.token == null){
+                return ifToken
             }
+            return new SyntaxError(self.token, "Unexpected token after 'then'") // Tokens after then
         }
         return new SyntaxError(self.previous, "Expected 'then")
     }
@@ -1306,12 +1364,10 @@ class Parser {
                 self.advance_line()
                 while(self.currentTokens != null){ // Loops through remaining tokens
                     self.continue()
-                    if (self.token instanceof TemplateKeyword){ // Check for endif
-                        if (self.token.tag == "endif"){
-                            mainStatement.elseCase = currentIfStatement // Adds else case
-                            this.continue()
-                            return mainStatement
-                        }
+                    if (self.check_tag("endif")){ // Check for endif
+                        mainStatement.elseCase = currentIfStatement // Adds else case
+                        this.continue()
+                        return mainStatement
                     }
                     let result = self.parse() // Adds the asts
                     if (result instanceof Error){
@@ -1321,19 +1377,12 @@ class Parser {
                     self.advance_line()
                 }
                 return new SyntaxError(mainStatement, "Expected endif at end of if statement") // Not complete
-            } else if (self.token instanceof TemplateKeyword){ // Check for endif
-                if (self.token.tag == "endif"){
-                    mainStatement.cases.push(currentIfStatement) // Pushes old if case
-                    this.continue()
-                    return mainStatement
-                } // Otherwise do defauly
-                let result = self.parse()
-                if (result instanceof Error){
-                    return result
-                }
-                currentIfStatement.contents.push(result)
+            } else if (self.check_tag("endif")){ // Check for endif
+                mainStatement.cases.push(currentIfStatement) // Pushes old if case
+                this.continue()
+                return mainStatement // complete
             } else {
-                let result = self.parse() // Dafault
+                let result = self.parse() // Default
                 if (result instanceof Error){
                     return result
                 }
@@ -1362,11 +1411,9 @@ class Parser {
         self.advance_line()
         while (self.currentTokens != null){
             self.continue()
-            if (self.token instanceof TemplateKeyword){
-                if (self.token.tag == "endwhile"){
-                    this.continue()
-                    return whileToken
-                }
+            if (self.check_tag("endwhile")){
+                this.continue()
+                return whileToken
             }
             let result = self.parse()
             if (result instanceof Error){
@@ -1387,22 +1434,20 @@ class Parser {
         self.advance_line()
         while (self.currentTokens != null){ // adding contents
             self.continue()
-            if (self.token instanceof TemplateKeyword){
-                if (self.token.tag == "until"){ // finishing loop
-                    self.continue()
-                    if (self.token == null){
-                        return new SyntaxError(self.previous, "Expected condition after 'until'")
-                    }
-                    let condition = self.statement_chain(self) // get condition
-                    if (condition instanceof Error){
-                        return condition
-                    }
-                    doToken.condition = condition
-                    if (self.token != null){
-                        return new SyntaxError(self.token, "Expected no tokens after condition")
-                    }
-                    return doToken // returned
+            if (self.check_tag("until")){ // finishing loop
+                self.continue()
+                if (self.token == null){
+                    return new SyntaxError(self.previous, "Expected condition after 'until'")
                 }
+                let condition = self.statement_chain(self) // get condition
+                if (condition instanceof Error){
+                    return condition
+                }
+                doToken.condition = condition
+                if (self.token != null){
+                    return new SyntaxError(self.token, "Expected no tokens after condition")
+                }
+                return doToken // returned
             }
             let result = self.parse() // default case
             if (result instanceof Error){
@@ -1432,10 +1477,8 @@ class Parser {
         if (self.token == null){
             return new SyntaxError(self.previous, "Expected 'to' to follow assignment")
         }
-        if (!(self.token instanceof TemplateKeyword)){ // ensures next token is to
-            if (self.token.tag != "to"){
-                return new SyntaxError(self.token, "Expected 'to'")
-            }
+        if (!self.check_tag("to")){ // ensures next token is to
+            return new SyntaxError(self.token, "Expected 'to'")
         }
         self.continue()
         if (self.token == null){
@@ -1449,9 +1492,7 @@ class Parser {
         if (self.token == null){ // no step keyword
             forToken.step = new IntegerType(self.previous.position, self.previous.line, 1)
         } else {
-            if (!(self.token instanceof TemplateKeyword)){ // ensures next token is step
-                return new SyntaxError(self.token, "Expected 'step' or end of line")
-            } else if (self.token.tag != "step"){
+            if (!self.check_tag("step")){ // ensures next token is step
                 return new SyntaxError(self.token, "Expected 'step' or end of line")
             }
             self.continue()
@@ -1470,24 +1511,22 @@ class Parser {
         self.advance_line()
         while (self.currentTokens != null){
             self.continue()
-            if (self.token instanceof TemplateKeyword){
-                if (self.token.tag == "next"){
-                    self.continue()
-                    if (self.token == null){
-                        return new SyntaxError(self.previous, `Expected '${forToken.variable.name}' after 'next'`)
-                    }
-                    if (!(self.token instanceof Identifier)){
-                        return new SyntaxError(self.token, `Expected identifier named '${forToken.variable.name}'`)
-                    }
-                    if (self.token.name != forToken.variable.name){
-                        return new SyntaxError(self.token, `Expected identifier to be named '${forToken.variable.name}'`)
-                    }
-                    self.continue()
-                    if (self.token != null){
-                        return new SyntaxError(self.token, `Expected no tokens after '${forToken.variable.name}'`)
-                    }
-                    return forToken
+            if (self.check_tag("next")){
+                self.continue()
+                if (self.token == null){
+                    return new SyntaxError(self.previous, `Expected '${forToken.variable.name}' after 'next'`)
                 }
+                if (!(self.token instanceof Identifier)){
+                    return new SyntaxError(self.token, `Expected identifier named '${forToken.variable.name}'`)
+                }
+                if (self.token.name != forToken.variable.name){
+                    return new SyntaxError(self.token, `Expected identifier to be named '${forToken.variable.name}'`)
+                }
+                self.continue()
+                if (self.token != null){
+                    return new SyntaxError(self.token, `Expected no tokens after '${forToken.variable.name}'`)
+                }
+                return forToken
             }
             let result = self.parse()
             if (result instanceof Error){
@@ -1497,6 +1536,58 @@ class Parser {
             self.advance_line()
         }
         return new SyntaxError(forToken, `Expected 'next ${forToken.variable.name}' to close loop`)
+    }
+
+    build_subroutine(self){
+        self.allowReturn = self.token.tag == "function"
+        let subroutineToken = self.token // defining token
+        self.continue()
+        if (!self.token instanceof Identifier){ // function name
+            return new SyntaxError(self.token, "Expected identifier for procedure")
+        }
+        subroutineToken.identifier = self.token
+        self.continue()
+        if (self.token == null || !self.check_tag("(")){
+            return new SyntaxError(self.token == null ? subroutineToken : self.token, "Expected '('")
+        }
+        let call = self.call(self) // checking parameters
+        if (call instanceof Error){
+            return call
+        }
+        subroutineToken.parameters = call.argumentsAsts
+        if (self.token != null){
+            return new SyntaxError(self.token, "Expected no tokens following subroutine definition")
+        }
+        self.advance_line()
+        while (self.currentTokens != null){ // adding contents
+            self.continue()
+            if (self.check_tag("end" + subroutineToken.tag)){ // closing clause
+                this.continue()
+                self.allowReturn = false
+                return subroutineToken
+            }
+            let result = self.parse()
+            if (result instanceof Error){
+                return result
+            }
+            subroutineToken.contents.push(result)
+            self.advance_line()
+        }
+        return new SyntaxError(subroutineToken, "Expected 'endprocedure' to close procedure")
+    }
+
+    return(self){
+        let returnToken = self.token
+        self.continue()
+        if (self.token == null){
+            return returnToken
+        }
+        let result = self.statement_chain(self)
+        if (result instanceof Error){
+            return result
+        }
+        returnToken.child = result
+        return returnToken
     }
 
     // First parameter = References the instance of the parser
@@ -1525,14 +1616,14 @@ class Parser {
     parse_brackets(self, end, nextFunction){
         let bracket = self.token
         self.continue()
-        if (self.token instanceof end){
+        if (self.check_tag(end)){
             return new SyntaxError(bracket, "'()' was empty")
         }
         let result = nextFunction(self)
         if (result instanceof Error){
             return result
         }
-        if (self.token instanceof end){
+        if (self.check_tag(end)){
             self.continue()
             return result
         }
@@ -1543,9 +1634,76 @@ class Parser {
 ////////////////
 // EXECUTION
 ////////////////
+class Evaluator {
+    static global = new SymbolTable()
+    static currentScope = Evaluator.global
 
-class Interpreter { 
+    evaluate_loop(loop){
+        let condition = loop.evaluate_condition()
+        if (condition instanceof Error){
+            return condition
+        }
+        while (condition){
+            let result = this.evaluate_many_asts(loop.evaluate())
+            if (result != null){
+                return result
+            }
+            condition = loop.evaluate_condition()
+            if (condition instanceof Error){
+                condition
+            }
+        }
+        loop.reset()
+        return null
+    }
+
+    evaluate_single_ast(ast){
+        if (ast instanceof Return){
+            return ast
+        }
+        if (ast instanceof IfStatement){
+            let result = ast.evaluate()
+            if (result instanceof Error){
+                return result
+            }
+            return this.evaluate_many_asts(result)
+        }
+        if (ast instanceof Loop){
+            return this.evaluate_loop(ast)
+        }
+        if (ast instanceof Error){
+            return ast
+        }
+        if (ast == null){
+            return
+        }
+        let evaluated = ast.evaluate()
+        if (evaluated instanceof Error){
+            return evaluated
+        }
+        if (evaluated != null){
+            console.log(evaluated.display())
+        }
+        return null
+    }
+
+    evaluate_many_asts(asts){
+        if (asts == null){
+            return
+        }
+        for (let ast of asts){
+            let result = this.evaluate_single_ast(ast)
+            if (result != null){
+                return result
+            }
+        }
+        return null
+    }
+}
+
+class Interpreter extends Evaluator{ 
     constructor(){
+        super()
         this.plaintext = null
         this.tokens = []
         this.have_tokens = false
@@ -1576,67 +1734,6 @@ class Interpreter {
         this.have_tokens = true
     }
 
-    evaluate_loop(loop){
-        let condition = loop.evaluate_condition()
-        if (condition instanceof Error){
-            console.log(condition.display())
-            return 1
-        }
-        while (condition){
-            if (this.evaluate_many_asts(loop.evaluate()) == 1){
-                return 1    
-            }
-            condition = loop.evaluate_condition()
-            if (condition instanceof Error){
-                console.log(condition.display())
-                return 1
-            }
-        }
-        loop.reset()
-        return 0
-    }
-
-    evaluate_single_ast(ast){
-        if (ast instanceof IfStatement){
-            let result = ast.evaluate()
-            if (result instanceof Error){
-                console.log(result.display())
-                return 1
-            }
-            return this.evaluate_many_asts(result)
-        }
-        if (ast instanceof Loop){
-            return this.evaluate_loop(ast)
-        }
-        if (ast instanceof Error){
-            console.log(ast.display())
-            return 1
-        }
-        if (ast == null){
-            return 0
-        }
-        let evaluated = ast.evaluate()
-        if (evaluated != null){
-            console.log(evaluated.display())
-        } 
-        if (evaluated instanceof Error){
-            return 1
-        }
-        return 0
-    }
-
-    evaluate_many_asts(asts){
-        if (asts == null){
-            return 0
-        }
-        for (let ast of asts){
-            if (this.evaluate_single_ast(ast) == 1){
-                return 1
-            }
-        }
-        return 0
-    }
-
     run(){
         if (!this.have_tokens){
             let result = this.make_tokens()
@@ -1648,7 +1745,9 @@ class Interpreter {
         let parser = new Parser(this.tokens)
         let ast = parser.parse_next()
         while (ast != null){
-            if (this.evaluate_single_ast(ast) == 1){
+            let result = this.evaluate_single_ast(ast)
+            if (result instanceof Error){
+                console.log(result.display()) // all errors printed here
                 return 1
             }
             ast = parser.parse_next()
@@ -1669,11 +1768,37 @@ class Interpreter {
         let code = this.run()
         console.log(`\nExited with code ${code}`)
     }
+
+    debug_asts(fileName){
+        this.get_plaintext_from_file(fileName)
+        if (!this.have_tokens){
+            let result = this.make_tokens()
+            if (result instanceof Error){
+                console.log(result.display())
+            }
+        }
+        let parser = new Parser(this.tokens)
+        let ast = parser.parse_next()
+        while (ast != null){
+            console.log(ast)
+            ast = parser.parse_next()
+        }
+    }
 }
 
 ////////////////
 // MAIN
 ////////////////
+
+// let procedure = new Subroutine()
+// procedure.parameters = [new Identifier(0,0,"a"), new Identifier(0,0,"b")]
+// let funcParser = new Parser(new Lexer(["a + b"]).make_tokens())
+// procedure.contents.push(funcParser.parse_next())
+// let id = new Identifier(1, 1, "sum")
+// id.assign().set(procedure)
+// let main = new Interpreter()
+// main.set_plaintext_manually("sum(1,2)")
+// console.log(main.run())
 
 let commandLineArguments = process.argv
 main = new Interpreter()
