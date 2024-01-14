@@ -7,50 +7,65 @@ class SymbolTable {
         this.table = []
     }
 
-    find(token){
-        for (let item of this.table){
+    get(token){
+        for (let item of this.table){ // Checks if in current table
             if (item.name == token.name){
-                item.lastReferenced = token
-                return item
+                return item.value
             }
         }
-        this.table.push(new Symbol(token))
-        return this.table[this.table.length - 1]
+        if (this != Evaluator.global){ // If current table isnt global, checks global
+            for (let item of Evaluator.global.table){
+                if (item.name == token.name){
+                    return item.value
+                }
+            }
+        }
+        return new IdentifierError(token, "was not declared") // Not defined
+    }
+
+    set(token, newValue){
+        for (let item of this.table){ // Checks own table onlky
+            if (item.name == token.name){
+                return item.set(token, newValue)
+            }
+        }
+        this.table.push(new Symbol(token)) // If doesn't exist, will create
+        return this.table[this.table.length - 1].set(token, newValue)
+    }
+
+    push_native_subroutine(name, subroutine, tag=null){
+        let symbol = new Symbol(new Identifier(null, null, name, true))
+        if (tag == null){
+            symbol.value = new subroutine(null, null)
+        } else {
+            symbol.value = new subroutine(null, null, tag)
+        }
+        this.table.push(symbol)
     }
 }
 
 class Symbol {
     constructor(token){
         this.name = token.name
-        this._value = null
-        this.lastReferenced = token
-        this.constant = token.constant
-        if (this.constant){
-            this.declared = false
-        }
+        this.value = null
+        this.constant = token.constant // Is a constant
+        this.declared = false // If it is a constant, has it been declared
     }
 
-    get value(){
-        if (this._value == null){
-            return new IdentifierError(this.lastReferenced, "was not declared")
-        }
-        return this._value
-    }
-
-    set(newValue){
-        if (this.lastReferenced.constant == true){
+    set(token, newValue){
+        if (token.constant){ // Check if is now a constant
             this.constant = true
             this.declared = false
         }
-        if (!(this.constant)){
-            this._value = newValue
+        if (!this.constant){ // Normal variable
+            this.value = newValue
             return null
         }
-        if (this.declared){
-            return new IdentifierError(this.lastReferenced, "is a constant and has already been defined")
+        if (this.declared){ // Constant and already defined
+            return new IdentifierError(token, "is a constant and has already been defined")
         }
-        this.declared = true
-        this._value = newValue
+        this.declared = true // Defining a constant
+        this.value = newValue
         return null
     }
 }
@@ -90,13 +105,14 @@ class BinaryOperator extends Token{
     }
 
     evaluate(){
-        this.leftValue = this.left.evaluate()
+        let leftValueHolder = this.left.evaluate()
         this.rightValue = this.right.evaluate()
-        if (this.leftValue instanceof Error){
-            return this.leftValue
+        this.leftValue = leftValueHolder
+        if (this.contains_type(Error)){
+            return this.leftValue instanceof Error ? this.leftValue : this.rightValue
         }
-        if (this.rightValue instanceof Error){
-            return this.rightValue
+        if (this.contains_type(Return)){
+            return new EvaluationError((this.leftValue instanceof Return ? this.leftValue : this.rightValue), "Cannot operate on subroutine with no return")
         }
         return this.calculate()
     }
@@ -147,12 +163,12 @@ class Add extends BinaryOperator{
             return new StringType(this.position, this.line, this.get_result()) // Concatenation
         } // ERRORS
         if (this.leftValue instanceof StringType){ // String + ?
-            return new TypeError(this, `Cannot concatenate type ${this.rightValue.type_to_string()} with String, expected String`)
+            return new TypeError(this, `Cannot concatenate type ${this.rightValue.typeAsString} with String, expected String`)
         } 
-        if (this.leftValue instanceof IntegerType || this.rightValue instanceof FloatType){ // Number + ?
-            return new TypeError(this, `Cannot add type ${this.rightValue.type_to_string()} to ${this.leftValue.type_to_string()}, expected Integer or Float`)
+        if (this.leftValue instanceof IntegerType || this.leftValue instanceof FloatType){ // Number + ?
+            return new TypeError(this, `Cannot add type ${this.rightValue.typeAsString} to ${this.leftValue.typeAsString}, expected Integer or Float`)
         } // ELSE
-        return new TypeError(this, `Cannot combine types ${this.leftValue.type_to_string()} and ${this.rightValue.type_to_string()}`)
+        return new TypeError(this, `Cannot combine types ${this.leftValue.typeAsString} and ${this.rightValue.typeAsString}`)
     }
 
     get_result = () => this.leftValue.value + this.rightValue.value
@@ -166,7 +182,7 @@ class Minus extends BinaryOperator{
         if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return for addition
         } // ERRORS
-        return new TypeError(this, `Cannot subtract type ${this.rightValue.type_to_string()} from ${this.leftValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot subtract type ${this.rightValue.typeAsString} from ${this.leftValue.typeAsString}, expected Integers or Floats`)
     }
 
     get_result = () => this.leftValue.value - this.rightValue.value
@@ -184,7 +200,7 @@ class Multiply extends BinaryOperator{
         if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return for addition
         } // ERRORS
-        return new TypeError(this, `Cannot mutltiply type ${this.leftValue.type_to_string()} with ${this.rightValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot mutltiply type ${this.leftValue.typeAsString} with ${this.rightValue.typeAsString}, expected Integers or Floats`)
     }
 
     get_result = () => this.leftValue.value * this.rightValue.value
@@ -202,7 +218,7 @@ class Divide extends BinaryOperator{
             let result = this.get_result() // Must check as can produce a float result
             return String(result).includes('.') ? new FloatType(this.position, this.line, result) : new IntegerType(this.position, this.line, result)
         } // ERRORS
-        return new TypeError(this, `Cannot divide type ${this.rightValue.type_to_string()} by ${this.leftValue.type_to_string()}, expected Integes or Floats`)
+        return new TypeError(this, `Cannot divide type ${this.rightValue.typeAsString} by ${this.leftValue.typeAsString}, expected Integes or Floats`)
     }
 
     get_result = () => this.leftValue.value / this.rightValue.value
@@ -220,7 +236,7 @@ class Exponent extends BinaryOperator{
             let result = this.get_result() // Must check as can produce a float result
             return String(result).includes('.') ? new FloatType(this.position, this.line, result) : new IntegerType(this.position, this.line, result)
         } // ERRORS
-        return new TypeError(this, `Cannot divide type ${this.rightValue.type_to_string()} by ${this.leftValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot divide type ${this.rightValue.typeAsString} by ${this.leftValue.typeAsString}, expected Integers or Floats`)
     }
 
     get_result = () => this.leftValue.value ** this.rightValue.value
@@ -237,7 +253,7 @@ class Modulus extends BinaryOperator{
         if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return
         } // ERRORS
-        return new TypeError(this, `Cannot take modulus of type ${this.leftValue.type_to_string()} modulo ${this.rightValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot take modulus of type ${this.leftValue.typeAsString} modulo ${this.rightValue.typeAsString}, expected Integers or Floats`)
     }
 
     get_result = () => this.leftValue.value % this.rightValue.value
@@ -254,7 +270,7 @@ class Quotient extends BinaryOperator{
         if (this.strict_type_check(IntegerType, IntegerType)){ // Contains two integers
             return new IntegerType(this.position, this.line, this.get_result()) // Definitely an integer return
         } // ERRORS
-        return new TypeError(this, `Cannot take the quotient of type ${this.leftValue.type_to_string()} and ${this.rightValue.type_to_string()}, expected Integers or Floats`)
+        return new TypeError(this, `Cannot take the quotient of type ${this.leftValue.typeAsString} and ${this.rightValue.typeAsString}, expected Integers or Floats`)
     }
 
     get_result = () => Math.floor(this.leftValue.value / this.rightValue.value)
@@ -266,7 +282,6 @@ class Quotient extends BinaryOperator{
 
 class Equals extends BinaryOperator{
     evaluate(){
-        this.leftValue = this.left.assign()
         this.rightValue = this.right.evaluate()
         if (this.leftValue instanceof Error){
             return this.leftValue
@@ -274,7 +289,7 @@ class Equals extends BinaryOperator{
         if (this.rightValue instanceof Error){
             return this.rightValue
         }
-        return this.leftValue.set(this.rightValue)
+        return this.left.set(this.rightValue)
     }
 }
 
@@ -287,7 +302,7 @@ class And extends BinaryOperator{
         if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
             return new BooleanType(this.position, this.line, this.get_result()) // Expected result
         } // ERRORS
-        return new TypeError(this, `Cannot use AND on type ${this.rightValue.type_to_string()} with ${this.leftValue.type_to_string()}, expected Booleans`)
+        return new TypeError(this, `Cannot use AND on type ${this.rightValue.typeAsString} with ${this.leftValue.typeAsString}, expected Booleans`)
     }
 
     get_result = () => this.leftValue.value && this.rightValue.value
@@ -298,7 +313,7 @@ class Or extends BinaryOperator{
         if (this.strict_type_check(BooleanType, BooleanType)){ // Contains two Booleans
             return new BooleanType(this.position, this.line, this.get_result()) // Expected result
         } // ERRORS
-        return new TypeError(this, `Cannot use OR on type ${this.rightValue.type_to_string()} with ${this.leftValue.type_to_string()}, expected Booleans`)
+        return new TypeError(this, `Cannot use OR on type ${this.rightValue.typeAsString} with ${this.leftValue.typeAsString}, expected Booleans`)
     }
 
     get_result = () => this.leftValue.value || this.rightValue.value
@@ -318,7 +333,7 @@ class Not extends Token{
         if (childValue instanceof BooleanType){
             return new BooleanType(this.position, this.line, !childValue.value)
         }
-        return new TypeError(this, `Cannot use NOT on type ${childValue.type_to_string()}, expected Boolean`)
+        return new TypeError(this, `Cannot use NOT on type ${childValue.typeAsString}, expected Boolean`)
     }
 }
 
@@ -339,7 +354,7 @@ class ComparisonOperator extends BinaryOperator{
             return new TypeError(this, `Cannot compare two Booleans with comparator '${this.tag}', only '==' or '!='`)
         }
         // ERRORS
-        return new TypeError(this, `Cannot compare type ${this.rightValue.type_to_string()} against ${this.leftValue.type_to_string()}`)
+        return new TypeError(this, `Cannot compare type ${this.rightValue.typeAsString} against ${this.leftValue.typeAsString}`)
     }
 
     get_result(){
@@ -373,19 +388,17 @@ class DataType extends Token{
     evaluate() {
         return this
     }
-
-    call(){
-        return new EvaluationError(self, `Type ${this.type_to_string()} cannot be called`)
-    }
 }
 
 class IntegerType extends DataType{
+    get typeAsString(){
+        return "Integer"
+    }
+
     display(){
         return String(this.value)
     }
-
-    type_to_string = () => "Integer"
-
+    
     cast_to_type(type){ // FROM INTEGERS
         switch (type){
             case IntegerType:
@@ -401,6 +414,10 @@ class IntegerType extends DataType{
 }
 
 class FloatType extends DataType{
+    get typeAsString(){
+        return "Float"
+    }
+
     display(){
         if (String(this.value).includes('.')){
             return String(this.value)
@@ -408,9 +425,7 @@ class FloatType extends DataType{
         return String(this.value) + ".0"
     }
     
-    type_to_string = () => "Float"
-
-    cast_to_type(type){ // FROM FLOAT
+     cast_to_type(type){ // FROM FLOAT
         switch (type){
             case IntegerType:
                 return new IntegerType(this.position, this.line, Math.floor(this.value))
@@ -425,11 +440,13 @@ class FloatType extends DataType{
 }
 
 class BooleanType extends DataType{
+    get typeAsString(){
+        return "Boolean"
+    }
+
     display(){
         return this.value ? "True" : "False"
     }
-
-    type_to_string = () => "Boolean"
 
     cast_to_type(type){ // FROM BOOLEAN
         switch (type){
@@ -445,12 +462,14 @@ class BooleanType extends DataType{
 }
 
 class StringType extends DataType{
+    get typeAsString(){
+        return "String"
+    }
+
     display(){
         return this.value
     }
-
-    type_to_string = () => "String"
-
+    
     cast_to_type(type){ // FROM STRING
         switch (type){
             case IntegerType: // Can be converted to a number, no full stops
@@ -483,19 +502,19 @@ class StringType extends DataType{
 ////////////////
 
 class Identifier extends Token{
-    constructor(position, line, name){
+    constructor(position, line, name, constant=false){
         super(position, line)
         this.name = name
-        this.constant = false
+        this.constant = constant
         this.global = false
     }
 
     evaluate(){
-        return (this.global ? Evaluator.global : Evaluator.currentScope).find(this).value
+        return Evaluator.currentScope.get(this)
     }
 
-    assign(){
-        return (this.global ? Evaluator.global : Evaluator.currentScope).find(this)
+    set(newValue){
+        return (this.global ? Evaluator.global : Evaluator.currentScope).set(this, newValue)
     }
 }
 
@@ -507,11 +526,31 @@ class Call extends Token{
     }
 
     evaluate(){
-        return this.callee.evaluate().call(this.argumentsAsts)
+        let callee = this.callee.evaluate() // Ensures callee is valid datatpye
+        if (callee instanceof Subroutine){
+            return this.callee.evaluate().call(this)
+        }
+        if (callee instanceof Error){
+            return callee
+        }
+        if (callee instanceof DataType){
+            return new TypeError(this.callee, `Type ${callee.typeAsString} cannot be called`)
+        }
+        return new TypeError(this.callee, "Cannot call this")
     }
 }
 
-class Subroutine extends Token{
+class Subroutine extends Token {
+    static nullReturn = {typeAsString : "EmptySubroutineReturn"}
+
+    get typeAsString(){
+        return "Subroutine"
+    }
+}
+
+class UserDefinedSubroutine extends Subroutine {
+    static callStackSize = 0
+
     constructor(position, line, tag){
         super(position, line)
         this.tag = tag
@@ -520,35 +559,161 @@ class Subroutine extends Token{
         this.identifier = null
     }
 
-    call(argumentsAsts){
-        let previousScope = Evaluator.currentScope
-        Evaluator.currentScope = new SymbolTable()
-        if (this.parameters.length != argumentsAsts.length){
+    call(call){
+        if (UserDefinedSubroutine.callStackSize >= 1500){
+            return new EvaluationError(call, "Call stack exceeded maximum size of 1500")
+        }
+        UserDefinedSubroutine.callStackSize++
+        if (this.parameters.length != call.argumentsAsts.length){
             return new EvaluationError(call, `Subroutine expected ${this.parameters.length} arguments, ${call.argumentsAsts.length} given`)
         }
-        for (let i = 0; i < this.parameters.length; i++){
-            let result = argumentsAsts[i].evaluate()
+        let argumentsValues = []
+        for (let i = 0; i < call.argumentsAsts.length; i++){ // First get argument values in old scope
+            let result = call.argumentsAsts[i].evaluate()
             if (result instanceof Error){
                 return result
             }
-            this.parameters[i].assign().set(result)
+            argumentsValues.push(result)
+        }
+        let previousScope = Evaluator.currentScope // Then change
+        Evaluator.currentScope = new SymbolTable()
+        for (let i = 0; i < argumentsValues.length; i++){ // Then sets parmaters in new scope
+            this.parameters[i].set(argumentsValues[i])
         }
         let result = new Evaluator().evaluate_many_asts(this.contents)
         if (result instanceof Error){
             return result
         }
-        let returnValue = null
+        let returnValue
         if (result instanceof Return){
             returnValue = result.child.evaluate()
+        } else {
+            returnValue = Subroutine.nullReturn
         }
         Evaluator.currentScope = previousScope
+        UserDefinedSubroutine.callStackSize--
         return returnValue
     }
 
     evaluate(){
-        this.identifier.assign().set(this)
+        this.identifier.set(this)
     }
 }
+
+class Print extends Subroutine {
+    call(call){
+        let output = [] // output
+        if (call.argumentsAsts.length == 0){ // Ensure 1 or more parameters
+            return new EvaluationError(call, "print expected 1 or more arguments, 0 given")
+        }
+        for (let item of call.argumentsAsts){
+            let result = item.evaluate()
+            if (result instanceof Error){
+                return result
+            }
+            if (!(result instanceof StringType)){
+                return new EvaluationError(result, `Can only print type String, not ${result.typeAsString}`)
+            }
+            output.push(result.display())
+        }
+        console.log(output.join(' ')) // ONLY PRINT STATEMENT
+        return Subroutine.nullReturn
+    }
+}
+
+class Input extends Subroutine {
+    call(call){
+        if (call.argumentsAsts.length > 1){ // Ensure 1 parameter
+            return new EvaluationError(call, `input expected 0 or 1 arguments, ${call.argumentsAsts.length} given`)
+        }
+        let message = ""
+        if (call.argumentsAsts.length == 1){
+            let result = call.argumentsAsts[0].evaluate()
+            if (result instanceof Error){
+                return result
+            }
+            if (!(result instanceof StringType)){
+                return new EvaluationError(result, `Can only output type String, not ${result.typeAsString}`)
+            }
+            message = result.display() // Outputs input message
+        }
+        return new StringType(call.position, call.line, prompt(message))
+    }
+}
+
+class Random extends Subroutine {
+    call(call){
+        if (call.argumentsAsts.length != 2){
+            return new EvaluationError(call, `random expected 2 arguments, ${call.argumentsAsts.length} given`)
+        }
+        let min = call.argumentsAsts[0].evaluate()
+        if (min instanceof Error){
+            return min
+        }
+        let max = call.argumentsAsts[1].evaluate()
+        if (max instanceof Error){
+            return max
+        }
+        if (min instanceof IntegerType && max instanceof IntegerType){
+            return new IntegerType(call.postition, call.line, Math.floor(Math.random() * (max.value - min.value + 1) + min.value))
+        }
+        if (start instanceof FloatType && max instanceof FloatType){
+            return new FloatType(call.position, call.line, Math.random() * (max.value - min.value) + min.value)
+        }
+        return new TypeError(call, `Cannot use random on type ${min.typeAsString} with ${max.typeAsString}, expected two Integers or two Float`)
+    }
+}
+
+class TypeCast extends Subroutine {
+    constructor(position, line, tag){
+        super(position,line)
+        this.tag = tag
+    }
+
+    call(call){
+        if (call.argumentsAsts.length != 1){
+            return new EvaluationError(call, `${this.tag} expected 1 argument, ${call.argumentsAsts.length} given`)
+        }
+        let old = call.argumentsAsts[0].evaluate()
+        if (old instanceof Error){
+            return old
+        }
+        return old.cast_to_type(this.tag)
+    }
+}
+
+class Asc extends Subroutine {
+    call(call){
+        if (call.argumentsAsts.length != 1){
+            return new EvaluationError(call, `asc expected 1 argument, ${call.argumentsAsts.length} given`)
+        }
+        let character = call.argumentsAsts[0].evaluate()
+        if (character instanceof Error){
+            return character
+        }
+        if (!(character instanceof StringType)){
+            return new TypeError(character, `Expected type String, not type ${character.typeAsString}`)
+        }
+        if (character.value.length != 1){
+            return new TypeError(character, "Expexted single character, as string of length 1")
+        }
+        return new IntegerType(call.position, call.line, character.value.charCodeAt(0))
+    }
+}
+
+class Chr extends Subroutine {
+    call(call){
+        if (call.argumentsAsts.length != 1){
+            return new EvaluationError(call, `chr expected 1 argument, ${call.argumentsAsts.length} given`)
+        }
+        let code = call.argumentsAsts[0].evaluate()
+        if (!(code instanceof IntegerType)){
+            return new TypeError(code, `Expected type Integer, not type ${code.typeAsString}`)
+        }
+        return new StringType(call.position, call.line, String.fromCharCode(code.value))
+    }
+}
+
 
 class Return extends Token {
     constructor(position, line){
@@ -557,6 +722,9 @@ class Return extends Token {
     }
 
     evaluate(){
+        if (this.child == null){
+            return null
+        }
         return this.child.evaluate()
     }
 }
@@ -587,7 +755,7 @@ class IfStatement extends Token{
                 return result
             }
             if (!(result instanceof BooleanType)){
-                return new TypeError(result, `Condition must be type Boolean, not ${result.type_to_string()}`)
+                return new TypeError(result, `Condition must be type Boolean, not ${result.typeAsString}`)
             }
             if (result.value === true){
                 return ifCase.contents
@@ -642,7 +810,7 @@ class While extends Loop{
             return condition
         }
         if (!(condition instanceof BooleanType)){
-            return new TypeError(condition, `Condition must be type Boolean, not ${condition.type_to_string()}`)
+            return new TypeError(condition, `Condition must be type Boolean, not ${condition.typeAsString}`)
         }
         return condition.value
     }
@@ -667,7 +835,7 @@ class Do extends Loop{
             return condition
         }
         if (!(condition instanceof BooleanType)){
-            return new TypeError(condition, `Condition must be type Boolean, not ${condition.type_to_string()}`)
+            return new TypeError(condition, `Condition must be type Boolean, not ${condition.typeAsString}`)
         }
         return !condition.value
     }
@@ -741,7 +909,7 @@ class For extends Loop{
         let condition = this.increasing ? newValue <= this.finishValue.value : newValue >= this.finishValue.value
         if (condition){ // only change identifier if another loop will occur
             this.variableValue.value = newValue
-            this.variable.assign().set(this.variableValue)
+            this.variable.set(this.variableValue)
         }
         return condition
     }
@@ -969,7 +1137,7 @@ class Lexer {
                 return new For(position, this.line)
             case "procedure":
             case "function":
-                return new Subroutine(position, this.line, name)
+                return new UserDefinedSubroutine(position, this.line, name)
             case "return":
                 return new Return(position, this.line)
             case "const":
@@ -1031,7 +1199,8 @@ class Parser {
         this.position = -1 // The current position in the line
         this.token = null // The corresponding token for the position
         this.previous = null // The previous token
-        this.allowReturn = false // Depends if a function is currently being parsed
+        this.allowReturn = false // True if a function is currently being parsed
+        this.allowSubroutines = true // False if a subroutine is being parsed
     }
 
     advance_line(){
@@ -1111,8 +1280,11 @@ class Parser {
             return this.build_for_loop(this)
         }
         // Checks for a subroutine definition
-        if (this.token instanceof Subroutine){
-            return this.build_subroutine(this)
+        if (this.token instanceof UserDefinedSubroutine){
+            if (this.allowSubroutines){
+                return this.build_subroutine(this)
+            }
+            return new SyntaxError(this.token, "Cannot define a subroutine inside another subroutine")
         }
         // Check if it is a return statement
         if (this.token instanceof Return) {
@@ -1165,29 +1337,32 @@ class Parser {
         return false
     }
 
-    call(self){
-        let call = new Call(self.token.position, self.token.line)
+    parse_arguments_or_parameters(self){
         self.continue()
         if (self.check_tag(')')){
             self.continue()
-            return call
+            return []
         }
+        let argumentsOrParameters = []
         let argument = self.statement_chain(self)
         if (argument instanceof Error){
             return argument
         }
-        call.argumentsAsts.push(argument)
+        argumentsOrParameters.push(argument)
         while (self.check_tag(',')){
             self.continue()
+            if (self.token == null || self.check_tag(')')){
+                return new SyntaxError(self.previous, "Expected next value to follow ','")
+            }
             argument = self.statement_chain(self)
             if (argument instanceof Error){
                 return argument
             }
-            call.argumentsAsts.push(argument)
+            argumentsOrParameters.push(argument)
         }
         if (self.check_tag(')')){
             self.continue()
-            return call
+            return argumentsOrParameters
         }
         return new SyntaxError(self.token, "Expected ')' or ',' followed by additional argument")
     }
@@ -1219,10 +1394,12 @@ class Parser {
             return new SyntaxError(self.token, "Expected literal")
         }
         while (self.check_tag('(')){
-            let call = self.call(self)
-            if (call instanceof Error){
-                return call
+            let call = new Call(self.token.position, self.token.line)
+            let argumentsAsts = self.parse_arguments_or_parameters(self)
+            if (argumentsAsts instanceof Error){
+                return argumentsAsts
             }
+            call.argumentsAsts = argumentsAsts
             call.callee = result
             result = call
         }
@@ -1540,21 +1717,33 @@ class Parser {
 
     build_subroutine(self){
         self.allowReturn = self.token.tag == "function"
+        self.allowSubroutines = false
         let subroutineToken = self.token // defining token
         self.continue()
-        if (!self.token instanceof Identifier){ // function name
-            return new SyntaxError(self.token, "Expected identifier for procedure")
+        if (self.token == null ){ // function name
+            return new SyntaxError(subroutineToken, `Expected identifier to follow ${subroutineToken.tag} decleration`)
+        }
+        if (!(self.token instanceof Identifier)){
+            return new SyntaxError(self.token, `Expected identifier`)
         }
         subroutineToken.identifier = self.token
         self.continue()
-        if (self.token == null || !self.check_tag("(")){
-            return new SyntaxError(self.token == null ? subroutineToken : self.token, "Expected '('")
+        if (self.token == null){
+            return new SyntaxError(self.previous, "Expected '(' to follow identifier")
         }
-        let call = self.call(self) // checking parameters
-        if (call instanceof Error){
-            return call
+        if (!self.check_tag("(")){
+            return new SyntaxError(self.token, "Expected '(' followed by arguments")
         }
-        subroutineToken.parameters = call.argumentsAsts
+        let parameters = self.parse_arguments_or_parameters(self) // checking parameters
+        if (parameters instanceof Error){
+            return parameters
+        }
+        for (let parameter of parameters){
+            if (!(parameter instanceof Identifier)){
+                return new SyntaxError(parameter, "Expected identifier as parameter")
+            }
+        }
+        subroutineToken.parameters = parameters
         if (self.token != null){
             return new SyntaxError(self.token, "Expected no tokens following subroutine definition")
         }
@@ -1564,6 +1753,7 @@ class Parser {
             if (self.check_tag("end" + subroutineToken.tag)){ // closing clause
                 this.continue()
                 self.allowReturn = false
+                self.allowSubroutines = true
                 return subroutineToken
             }
             let result = self.parse()
@@ -1681,9 +1871,9 @@ class Evaluator {
         if (evaluated instanceof Error){
             return evaluated
         }
-        if (evaluated != null){
-            console.log(evaluated.display())
-        }
+        // if (evaluated instanceof DataType){ // Old code to print everything
+        //     console.log(evaluated.display())
+        // }
         return null
     }
 
@@ -1707,6 +1897,20 @@ class Interpreter extends Evaluator{
         this.plaintext = null
         this.tokens = []
         this.have_tokens = false
+        this.build_global()
+    }
+
+    build_global(){
+        Evaluator.global.push_native_subroutine("print", Print)
+        Evaluator.global.push_native_subroutine("input", Input)
+        Evaluator.global.push_native_subroutine("random", Random)
+        Evaluator.global.push_native_subroutine("str", TypeCast, StringType)
+        Evaluator.global.push_native_subroutine("int", TypeCast, IntegerType)
+        Evaluator.global.push_native_subroutine("float", TypeCast, FloatType)
+        Evaluator.global.push_native_subroutine("real", TypeCast, FloatType)
+        Evaluator.global.push_native_subroutine("bool", TypeCast, BooleanType)
+        Evaluator.global.push_native_subroutine("ASC", Asc)
+        Evaluator.global.push_native_subroutine("CHR", Chr)
     }
 
     get_plaintext_from_file(fileName){
@@ -1789,16 +1993,6 @@ class Interpreter extends Evaluator{
 ////////////////
 // MAIN
 ////////////////
-
-// let procedure = new Subroutine()
-// procedure.parameters = [new Identifier(0,0,"a"), new Identifier(0,0,"b")]
-// let funcParser = new Parser(new Lexer(["a + b"]).make_tokens())
-// procedure.contents.push(funcParser.parse_next())
-// let id = new Identifier(1, 1, "sum")
-// id.assign().set(procedure)
-// let main = new Interpreter()
-// main.set_plaintext_manually("sum(1,2)")
-// console.log(main.run())
 
 let commandLineArguments = process.argv
 main = new Interpreter()

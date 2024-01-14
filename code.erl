@@ -1,6 +1,2 @@
-const five = 5
-function addFive(num)
-    return num + five
-endfunction
-
-addFive(6)
+print(str(ASC("A")))
+print(CHR(65))
