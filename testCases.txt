@@ -1,0 +1,822 @@
+2 + 2
+$
+4
+$
+6 + 6
+$
+12
+$
+3 > 2
+$
+True
+$
+2 ^ 3
+$
+8
+$
+for i = 0 to 10
+i
+next i
+$
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+$
+a = 7
+b = a
+b = b + 1
+a
+b
+$
+7
+8
+$
+for i = -3 to 3
+12 / i
+next i
+$
+-4
+-6
+-12
+error
+$
+for i = 1 to 3
+for j = 1 to 3
+i * j
+next j
+next i
+$
+1
+2
+3
+2
+4
+6
+3
+6
+9
+$
+*
+$
+error
+$
+const b = 7
+b = 8
+$
+error
+$
+a = 3
+while a == 3
+True
+a = 5
+endwhile
+$
+True
+$
+if True then
+if False then
+2
+elseif True then
+if False then
+2
+else
+3
+endif
+endif
+endif
+$
+3
+$
+if 3 then
+2
+endif
+$
+error
+$
+a = 0
+b = 0 / 0
+b
+$
+error
+$
+True AND False
+$
+False
+$
+*
+$
+error
+$
+for const a = 0 to 3
+a
+next a
+$
+error
+$
+True > True
+$
+error
+$
+((((((7)))+3)))
+$
+10
+$
+string = "hello"
+for i = 0 to 5
+string = string + "!"
+next i
+string
+$
+hello!!!!!!
+$
+±±±
+$
+error
+$
+a = 8
+doa
+$
+error
+$
+a = 8
+do
+a
+a = a / 2
+until a == 1
+$
+8
+4
+2
+$
+total = 0
+a = 16
+for i = 1 to a
+if a MOD i == 0 then
+total = total + 1
+endif
+next i
+total
+$
+5
+$
+for i = 0 to 3
+for j = i to 3
+i * j
+next j
+next i
+$
+0
+0
+0
+0
+1
+2
+3
+4
+6
+9
+$
+NOT NOT True
+$
+True
+$
+NOT NOT NOT True
+$
+False
+$
+NOT (NOT True) == (NOT False)
+$
+True
+$
+a = 28
+do
+a
+a = a / 2
+until a <= 2
+$
+28
+14
+7
+3.5
+$
+"hello" + ""
+$
+hello
+$
+string = "ab"
+for i = 1 to 4
+string = string + string
+next i
+string
+$
+abababababababababababababababab
+$
+2 * 0.3
+$
+0.6
+$
+4 ^ 0.5
+$
+2.0
+$
+6.0 / 3
+$
+2.0
+$
+if False then
+2
+elseif True
+4
+endif
+$
+error
+$
+for i = undefined to 7
+8
+next i
+$
+error
+$
+7----4
+$
+11
+$
+a = 32
+while a >= 2
+if a MOD 3 == 0 then
+a = a / 3
+else
+a = a + 1
+endif
+a
+endwhile
+$
+33
+11
+12
+4
+5
+6
+2
+3
+1
+$
+AND
+$
+error
+$
+(2 + 4))
+$
+error
+$
+a = (4 == 4) == True
+NOT a
+$
+False
+$
+5 DIV 0
+$
+error
+$
+"'hello'" + '"world"'
+$
+'hello'"world"
+$
+a = const b = 5
+a
+$
+error
+$
+a = 7
+b = 5
+while a != b
+if a > b then
+a = a - b
+else
+b = b - a
+endif
+endwhile
+a
+$
+1
+$
+6 + 9 * 6 + 9
+$
+69
+$
+a = 2
+while a < 100
+a = a ^ 2
+a
+endwhile
+$
+4
+16
+256
+$
+a = 678
+b = a MOD 17
+c = a DIV 17
+a == c * 17 + b
+$
+True
+$
+()
+$
+error
+$
+for i = 0 to 5
+f = ""
+for j = i to 5
+f = f + "*"
+next j
+f
+next i
+$
+******
+*****
+****
+***
+**
+*
+$
+"hello" * 7
+$
+error
+$
+for i = "hello" to "finish"
+i
+next i
+$
+error
+$
+i = 3
+while i > -2
+i * i
+i = i - 1
+endwhile
+9
+4
+1
+0
+1
+$
+9
+4
+1
+0
+1
+9
+4
+1
+0
+1
+$
+True AND True OR True AND True
+$
+True
+$
+for i = 1 to 4
+for j = 0 to 12 step i
+j
+next j
+next i
+$
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+0
+2
+4
+6
+8
+10
+12
+0
+3
+6
+9
+12
+0
+4
+8
+12
+$
+l = const
+$
+error
+$
++2+2
+$
+4
+$
+a = 7
+while a != 3
+for i = a to 10
+i
+next i
+a = a - 1
+endwhile
+$
+7
+8
+9
+10
+6
+7
+8
+9
+10
+5
+6
+7
+8
+9
+10
+4
+5
+6
+7
+8
+9
+10
+$
+(3)*(7)-(4)
+$
+17
+$
+string = ""
+for i = 1 to 3
+string = string + "a"
+for j = i to 4
+string = string + "b"
+next j
+next i
+string
+$
+abbbbabbbabb
+$
+for i = 1 to 10
+if i MOD 2 == 0 AND i MOD 3 == 0 then
+"FizzBuzz"
+elseif i MOD 2 == 0 then
+"Fizz"
+elseif i MOD 3 == 0 then
+"Buzz"
+else
+"None"
+endif
+next i
+$
+None
+Fizz
+Buzz
+Fizz
+None
+FizzBuzz
+None
+Fizz
+Buzz
+Fizz
+$
+a = 4
+b = 7
+c = 3
+if a > b then
+if a > c then
+a
+else
+c
+endif
+else
+if b > c then
+b
+else
+c
+endif
+endif
+$
+7
+$
+triangle = 0
+for i = 1 to 10
+triangle = triangle + i
+next i
+triangle
+$
+55
+$
+prime = True
+num = 57
+for i = 1 to num DIV 2
+if num MOD i == 0 then
+prime = False
+endif
+next i
+prime
+$
+False
+$
+test1 = 2
+test2 = 2.0
+test1 == test2
+$
+True
+$
+for i = -3 to 3
+10 ^ i
+next i
+$
+0.001
+0.01
+0.1
+1
+10
+100
+1000
+$
+if True then
+endif
+$
+
+$
+while False
+endwhile
+$
+
+$
+do
+until True
+$
+
+$
+z = 5
+z += 5
+z
+$
+error
+$
+"a" > "b"
+$
+False
+$
+"abcd" > "abc"
+$
+True
+$
+"test" != "TEST"
+$
+True
+$
+for i = 0 to 10000
+next i
+i
+$
+10000
+$
+endif
+$
+error
+$
+if True then
+2
+elseif True then
+3
+else
+4
+endif
+$
+2
+$
+if False then
+elseif False then
+else
+"passed"
+endif
+$
+passed
+$
+x = 3
+x
+$
+3
+$
+name = "Louise"
+name
+$
+Louise
+$
+const vat = 0.2
+vat
+vat = 0.25
+$
+0.2
+error
+$
+for i = 0 to 9
+"Loop"
+next i
+$
+Loop
+Loop
+Loop
+Loop
+Loop
+Loop
+Loop
+Loop
+Loop
+Loop
+$
+for i=2 to 10 step 2
+i
+next i
+$
+2
+4
+6
+8
+10
+$
+for i=10 to 0 step -1
+i
+next i
+$
+10
+9
+8
+7
+6
+5
+4
+3
+2
+1
+0
+$
+answer = "No"
+if answer == "Yes" then
+"Correct"
+elseif answer == "No" then
+"Wrong"
+else
+"Error"
+endif
+$
+Wrong
+$
+name = "Pramukhi"
+"Hello, your name is: " + name
+$
+Hello, your name is: Pramukhi
+$
+for i = 1 to 5 // step 2
+i
+next i
+$
+1
+2
+3
+4
+5
+$
+0
+$
+0
+$
+if a then
+True
+else
+False
+endif
+$
+error
+$
+for i = 12 to 1 step -1
+for j = 12 to 1 step -1
+if i == j then
+i * j
+endif
+next j
+next i
+$
+144
+121
+100
+81
+64
+49
+36
+25
+16
+9
+4
+1
+$
+2 AND 3
+$
+error
+$
+a = True
+b = True
+while a AND b
+"hello"
+b = 4
+endwhile
+$
+hello
+error
+$
+if "test" then
+True
+else
+False
+endif
+$
+error
+$
+True == True == True
+$
+error
+$
+NOT False OR False
+$
+True
+$
+(True AND False) OR (True AND (NOT False))
+$
+True
+$
+a = 2
+a ^ a ^ a
+$
+16
+$
+±
+$
+error
+$
+                 for           i=             8       to                10
+         i
+      next                       i
+$
+8
+9
+10
+$
+test = "cat"
+test = test + test + test
+test = test + test + test
+test
+$
+catcatcatcatcatcatcatcatcat
+$
+i = 0
+name = ""
+while i < 5
+if name == "aa" then
+"AA"
+endif
+name = name + "a"
+name
+i = i + 1
+endwhile
+$
+a
+aa
+AA
+aaa
+aaaa
+aaaaa
+$
+const const a = 5
+$
+error
+$
+if for i = 0 to 100 then
+"test"
+endif
+$
+error
+$
+"hello
+$
+error
