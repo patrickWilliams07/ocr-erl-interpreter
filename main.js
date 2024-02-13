@@ -22,12 +22,14 @@
 // IMPORTS
 ////////////////
 
-const prompt = require('prompt-sync')()
-const fs = require('fs')
+// const prompt = require('prompt-sync')()
+// const fs = require('fs')
+
+let outputField = document.getElementById("output")
 
 ////////////////
 // SYMBOL TABLE
-////////////////1212222
+////////////////
 
 class SymbolTable {
     constructor(){
@@ -531,7 +533,7 @@ class ArrayCall extends Token{
             return callee
         }
         if (!(callee instanceof ArrayType)){
-            return new TypeError(this, `Can only access value from type Array, not ${callee.typeAsString}`)
+            return new TypeError(this.callee, "Expected to get item from type Array")
         }
         let evaluatedIndexes = []
         for (let i = 0; i < this.indexes.length - (ignoreLastIndex ? 1 : 0); i++){ // converts ASTS to values
@@ -546,12 +548,6 @@ class ArrayCall extends Token{
 
     set(newValue){
         let outerArray = this.evaluate(true)
-        if (outerArray instanceof Error){
-            return outerArray
-        }
-        if (!(outerArray instanceof ArrayType)){
-            return new EvaluationError(outerArray, "Array does not have this many dimensions")
-        }
         let finalIndex = this.indexes[this.indexes.length-1].evaluate()
         if (finalIndex instanceof Error){
             return finalIndex
@@ -559,8 +555,8 @@ class ArrayCall extends Token{
         if (!(finalIndex instanceof IntegerType)){ // index must be integer
             return new SyntaxError(finalIndex, "Integer value required as index")
         }
-        if (finalIndex.value < 0 || finalIndex.value >= outerArray.arrayLength) { // ensure in range
-            return new EvaluationError(finalIndex, `Array index not in range from 0 to ${outerArray.arrayLength - 1}`)
+        if (finalIndex.value < 0 || finalIndex.value >= outerArray) { // ensure in range
+            return new EvaluationError(finalIndex, `Array index not in range from 0 to ${outerArray - 1}`)
         }
         if (outerArray.type == null){
             outerArray.type = newValue.typeAsString
@@ -578,34 +574,16 @@ class ArrayType extends Token {
 
     constructor(position, line){
         super(position, line)
-        this.creationAsts = []      // the initial asts to define the array in the line of code
-        this.isEmptyCreation = true // determines wether the array is predefined or not
-        this.contents = []          // the actual values of the array which is dynamically updated
-        this.type = null            // the data type of the array
+        this.astContents = [] // the initial asts to define the array in the line of code
+        this.contents = []    // the actual values of the array which is dynamically updated
+        this.type = null      // the data type of the array
         this.arrayLength = null
         this.identifier = null
     }
 
     get typeAsString(){
         return "Array"
-    }
-
-    display(){
-        let displayed = []
-        for (let item of this.contents){
-            if (item == ArrayType.nullValue){
-                displayed.push("<Empty>")
-            } else if (item instanceof StringType){
-                displayed.push(`"${item.display()}"`)
-            } else {
-                displayed.push(item.display())
-            }
-        }
-        if (this.type == "Array"){
-            return `[ ${displayed.join(",\n  ")} ]`
-        }
-        return `[ ${displayed.join(", ")} ]`
-    }
+    } 
 
     get_index(indexes){
         if (indexes.length == 0){
@@ -625,67 +603,31 @@ class ArrayType extends Token {
         if (!(this.contents[index.value] instanceof ArrayType)){ // Only do further dimensions if array
             return new EvaluationError(indexes[0], "Array does not have this many dimensions")
         }
-        return this.contents[index.value].get_index(indexes)
+        return this.contents[index.value].get_index(indexes) // Calling inside dimension
     }
 
-    evaluate(){
-        let result = this.isEmptyCreation ? this.evaluate_empty_array() : this.evaluate_defined_array()
-        if (result instanceof Error){
-            return result
+    evaluate(){ // ensuring identifier is assigned with values
+        this.contents = []
+        for (let item of this.astContents){
+            if (item == null){
+                this.contents.push(ArrayType.nullValue)
+            } else {
+                let result = item.evaluate()
+                if (result instanceof Error){
+                    return Error
+                }
+                if (this.type == null){
+                    this.type = item.typeAsString
+                } else if (this.type != item.typeAsString){
+                    return new TypeError(item, "Array can only be defined with a single data type")
+                }
+                this.contents.push(result)
+            }
         }
         if (this.identifier != null) {
             this.identifier.set(this)
         }
         return this
-    }
-
-    evaluate_defined_array(){ // ensuring identifier is assigned with values
-        let arrayLengths = null // for 2d arrays only
-        this.contents = []
-        for (let item of this.creationAsts){
-            let result = item.evaluate()
-            if (result instanceof Error){
-                return result
-            }
-            if (this.type == null){
-                this.type = item.typeAsString
-            } else if (this.type != item.typeAsString){ // not aligning types
-                return new TypeError(item, "Array can only be defined with a single data type")
-            }
-            if (item instanceof ArrayType){ // only if 2d array
-                if (arrayLengths == null){
-                    arrayLengths = item.arrayLength
-                } else if (arrayLengths != item.arrayLength) { // lengths dont match up
-                    return new EvaluationError(item, "All sub-arrays must be the same length")
-                }
-            }
-            this.contents.push(result)
-        }
-    }
-
-    evaluate_empty_array(){
-        let currentLength = this.creationAsts[0].evaluate() // this index
-        if (currentLength instanceof Error){
-            return currentLength
-        }
-        if (!(currentLength instanceof IntegerType)){ // ensure is integer
-            return new TypeError(currentLength, `Array length must be of type Integer, not ${currentLength.typeAsString}`)
-        }
-        this.arrayLength = currentLength.value
-        if (this.creationAsts.length == 1){ // if last dimension, fill with null
-            this.contents = Array(currentLength.value).fill(ArrayType.nullValue) // empty item
-            return
-        }
-        this.type = this.typeAsString // set type to array 
-        for (let i = 0; i < currentLength.value; i++){ // next dimension
-            let newArray = new ArrayType(currentLength.position, currentLength.line)
-            newArray.creationAsts = this.creationAsts.slice(1) // ignores first index
-            let result = newArray.evaluate_empty_array()
-            if (result instanceof Error){
-                return result
-            }
-            this.contents.push(newArray) // creates own contents
-        }
     }
 }
 
@@ -754,10 +696,6 @@ class UserDefinedSubroutine extends Subroutine {
         this.identifier = null
     }
 
-    display(){
-        return `<subroutine: ${this.identifier.name}>`
-    }
-
     call(call){
         if (UserDefinedSubroutine.callStackSize >= 1500){
             return new EvaluationError(call, "Call stack exceeded maximum size of 1500")
@@ -804,10 +742,6 @@ class UserDefinedSubroutine extends Subroutine {
 ////////////////
 
 class Print extends Subroutine {
-    display(){
-        return "<native subroutine: print>"
-    }
-
     call(call){
         let output = [] // output
         if (call.argumentsAsts.length == 0){ // Ensure 1 or more parameters
@@ -818,22 +752,17 @@ class Print extends Subroutine {
             if (result instanceof Error){
                 return result
             }
-            if (!(result instanceof DataType || result instanceof ArrayType ||
-                  result instanceof Subroutine)){
-                return new EvaluationError(item, `Can only print type String, not ${result.typeAsString}`)
+            if (!(result instanceof DataType)){
+                return new EvaluationError(result, `Can only print type String, not ${result.typeAsString}`)
             }
             output.push(result.display())
         }
-        console.log(output.join(' ')) // ONLY PRINT STATEMENT
+        outputField.value += output.join(' ') + "\n" // ONLY PRINT STATEMENT
         return Subroutine.nullReturn
     }
 }
 
 class Input extends Subroutine {
-    display(){
-        return "<native subroutine: input>"
-    }
-
     call(call){
         if (call.argumentsAsts.length > 1){ // Ensure 1 parameter
             return new EvaluationError(call, `input expected 0 or 1 arguments, ${call.argumentsAsts.length} given`)
@@ -854,10 +783,6 @@ class Input extends Subroutine {
 }
 
 class Random extends Subroutine {
-    display(){
-        return "<native subroutine: random>"
-    }
-
     call(call){
         if (call.argumentsAsts.length != 2){
             return new EvaluationError(call, `random expected 2 arguments, ${call.argumentsAsts.length} given`)
@@ -886,19 +811,6 @@ class TypeCast extends Subroutine {
         this.tag = tag
     }
 
-    display(){
-        switch (this.tag){
-            case IntegerType:
-                return "<native subroutine: int>"
-            case FloatType:
-                return "<native subroutine: float>"
-            case BooleanType:
-                return "<native subroutine: bool>"
-            case StringType:
-                return "<native subroutine: str>"
-        }
-    }
-
     call(call){
         if (call.argumentsAsts.length != 1){
             return new EvaluationError(call, `${this.tag} expected 1 argument, ${call.argumentsAsts.length} given`)
@@ -912,10 +824,6 @@ class TypeCast extends Subroutine {
 }
 
 class Asc extends Subroutine {
-    display(){
-        return "<native subroutine: ASC>"
-    }
-
     call(call){
         if (call.argumentsAsts.length != 1){
             return new EvaluationError(call, `asc expected 1 argument, ${call.argumentsAsts.length} given`)
@@ -935,10 +843,6 @@ class Asc extends Subroutine {
 }
 
 class Chr extends Subroutine {
-    display(){
-        return "<native subroutine: CHR>"
-    }
-
     call(call){
         if (call.argumentsAsts.length != 1){
             return new EvaluationError(call, `chr expected 1 argument, ${call.argumentsAsts.length} given`)
@@ -2007,9 +1911,6 @@ class Parser {
 
     parse_arguments_or_parameters(self, bracket){
         self.continue()
-        if (self.token == null){ // ensures does not end at [
-            return new SyntaxError(self.previous, `Expected first value or '${bracket}'`)
-        }
         if (self.check_tag(bracket)){
             self.continue()
             return []
@@ -2020,9 +1921,6 @@ class Parser {
             return argument
         }
         argumentsOrParameters.push(argument)
-        if (self.token == null){
-            return new SyntaxError(self.previous, `Expected '${bracket}' or ',' to follow first value`)
-        }
         while (self.check_tag(',')){
             self.continue()
             if (self.token == null || self.check_tag(bracket)){
@@ -2037,9 +1935,6 @@ class Parser {
         if (self.check_tag(bracket)){
             self.continue()
             return argumentsOrParameters
-        }
-        if (self.token == null){
-            return new SyntaxError(self.previous, `Expected '${bracket}' or ',' to follow value`)
         }
         return new SyntaxError(self.token, `Expected '${bracket}' or ',' followed by additional argument`)
     }
@@ -2211,37 +2106,42 @@ class Parser {
         array.identifier = self.token
         self.continue()
         if (self.token == null){
-            return new SyntaxError(self.previous, "Expected = or [] to follow identifier")
+            return new SyntaxError(self.token, "Expected = or [] to follow identifier")
         }
         if (self.check_tag('[')){
-            let errorToken = self.token
-            array.creationAsts = self.parse_arguments_or_parameters(self, ']')
-            if (array.creationAsts instanceof Error){
-                return array.creationAsts
-            }
-            if (array.creationAsts.length == 0){
-                return new SyntaxError(errorToken, "Array declaration must contain at least 1 dimension")
-            }
+            let values = self.parse_arguments_or_parameters(self, ']')
             if (self.token != null){
                 return new SyntaxError(self.token, "Expected no tokens after array declaration")
             }
-            return array
+            return self.create_empty_array(array, values)
         }
         if (self.token instanceof Equals){
             self.continue()
             if (!self.check_tag('[')){
-                return new SyntaxError(self.token == null ? self.previous : self.token , "Expected array to follow '='")
+                return new SyntaxError(self.token, "Expected array to follow '='")
             }
             return self.create_defined_array(self, array)
         }
     }
 
-    create_defined_array(self, array){
-        array.isEmptyCreation = false
-        self.continue()
-        if (self.token == null){
-            return new SyntaxError(self.previous, "Expected first value to follow '['")
+    create_empty_array(array, values){
+        let currentLength = values[0].value
+        if (values.length == 1){
+            array.astContents = Array(currentLength).fill(null) // empty item
+            array.arrayLength = currentLength
+            return array
         }
+        values.shift() // REMOVES FIRST ITEM
+        for (let i = 0; i < currentLength; i++){
+            let newArray = new ArrayType(array.position, array.line)
+            array.astContents.push(this.create_empty_array(newArray, values))
+        }
+        array.arrayLength = currentLength
+        return array
+    }
+
+    create_defined_array(self, array){
+        self.continue()
         if (self.check_tag(']')){
             return new SyntaxError(self.token, "Cannot create arrays with length 0")
         }
@@ -2256,10 +2156,7 @@ class Parser {
             return result
         }
         arrayLength += 1
-        array.creationAsts.push(result)
-        if (self.token == null){
-            return new SyntaxError(self.previous, "Expected ']' or ',' to follow first value")
-        }
+        array.astContents.push(result)
         while (self.check_tag(',')){
             self.continue()
             if (self.token == null || self.check_tag(']')){
@@ -2274,17 +2171,14 @@ class Parser {
                 return result
             }
             arrayLength += 1
-            array.creationAsts.push(result)
+            array.astContents.push(result)
         }
         if (self.check_tag(']')){
             array.arrayLength = arrayLength
             self.continue()
             return array
         }
-        if (self.token == null){
-            return new SyntaxError(self.previous, `Expected ']' or ',' to follow value`)
-        }
-        return new SyntaxError(self.token, `Expected ']' or ',' followed by additional argument`)
+        return new SyntaxError(self.token, `Expected ']' to close array`)
     }
 
     ////////////////
@@ -2846,7 +2740,7 @@ class Interpreter extends Evaluator{
         if (!this.have_tokens){
             let result = this.make_tokens()
             if (result instanceof Error){
-                console.log(result.display())
+                outputValue(result.display())
                 return 1
             }
         }
@@ -2855,7 +2749,7 @@ class Interpreter extends Evaluator{
         while (ast != null){
             let result = this.evaluate_single_ast(ast)
             if (result instanceof Error){
-                console.log(result.display()) // all errors printed here
+                outputValue(result.display()) // all errors printed here
                 return 1
             }
             ast = parser.parse_next()
@@ -2870,28 +2764,6 @@ class Interpreter extends Evaluator{
             this.set_plaintext_manually(prompt(" ERL ==> "))
         }
     }
-
-    run_file(fileName){
-        this.get_plaintext_from_file(fileName)
-        let code = this.run()
-        console.log(`\nExited with code ${code}`)
-    }
-
-    debug_asts(fileName){
-        this.get_plaintext_from_file(fileName)
-        if (!this.have_tokens){
-            let result = this.make_tokens()
-            if (result instanceof Error){
-                console.log(result.display())
-            }
-        }
-        let parser = new Parser(this.tokens)
-        let ast = parser.parse_next()
-        while (ast != null){
-            console.log(ast)
-            ast = parser.parse_next()
-        }
-    }
 }
 
 ////////////////
@@ -2899,10 +2771,25 @@ class Interpreter extends Evaluator{
 ////////////////
 
 
-let commandLineArguments = process.argv
-main = new Interpreter()
-if (commandLineArguments.length > 2){
-    main.run_file(commandLineArguments[2])
-} else {
-    console.log(" ! Pass a file to run as an argument")
+// let commandLineArguments = process.argv
+// main = new Interpreter()
+// if (commandLineArguments.length > 2){
+//     main.run_file(commandLineArguments[2])
+// } else {
+//     console.log(" ! Pass a file to run as an argument")
+// }
+
+
+let run = document.getElementById("run")
+let input = document.getElementById("input")
+let interpreter = new Interpreter()
+
+run.addEventListener("click", () => {
+    output.value = ""
+    interpreter.set_plaintext_manually(input.value)
+    interpreter.run()
+})
+
+function outputValue(value) {
+    output.value += value + "\n"
 }

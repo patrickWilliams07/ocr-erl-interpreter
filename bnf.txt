@@ -1,0 +1,9 @@
+<empty_array> ::= "array" Identifier '[' <expression> { ',' <expression> }  ']'
+<defined_array> ::= "array" Identifier Equals <array> 
+<array> ::= '[' [ <statement_chain> | <array> ] { ',' [ <statement_chain> | <array> ] } ']'
+
+
+
+
+
+ 
