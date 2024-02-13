@@ -1618,6 +1618,11 @@ class Lexer {
         this.character = this.position == this.currentPlaintext.length ? null : this.currentPlaintext[this.position]
     }
 
+    reverse(){
+        this.position -= 1
+        this.character = this.currentPlaintext[this.position]
+    }
+
     make_tokens(){
         let file = []
         while (this.currentPlaintext != null){
@@ -1712,10 +1717,24 @@ class Lexer {
         let position = this.position
         while (Lexer.DIGITS.includes(this.character) || this.character == '.'){
             number.push(this.character)
-            if (this.character == '.'){
-                fullStops += 1
-                if (fullStops == 2){
+            if (this.character == '.'){ // for full stops
+                fullStops += 1 // increment
+                if (fullStops == 2){ // float followed by .
+                    this.continue()
+                    if (!Lexer.DIGITS.includes(this.character)){ // property check
+                        this.reverse()
+                        return new FloatType(position, this.line, Number(number.join('')))
+                    } // error
                     return new LexicalError(this.position, this.line, "Only expected one '.' to create Float")
+                }
+                this.continue()
+                if (Lexer.DIGITS.includes(this.character)){ // float case
+                    number.push(this.character)
+                } else if (this.character == null) { // end case
+                    return new LexicalError(this.position, this.line, "Expected rest of Float to follow '.'")
+                } else { // property case
+                    this.reverse()
+                    return new IntegerType(position, this.line, Number(number.join('')))
                 }
             }
             this.continue()
@@ -1804,7 +1823,7 @@ class Lexer {
             string.push(this.character)
             this.continue()
         }
-        return this.character == null ? new LexicalError(position, this.line, "Unclosed string") :new StringType(position, this.line, string.join(''))
+        return this.character == null ? new LexicalError(position, this.line, "Unclosed string") : new StringType(position, this.line, string.join(''))
     }
 
     make_property(){
@@ -1828,6 +1847,8 @@ class Lexer {
                 return new WriteLine(position, this.line)
             case "close":
                 return new Close(position, this.line)
+            default:
+                return new LexicalError(position, this.line, `No property called '.${name}' exists`)
         }
     }
 }
@@ -1950,7 +1971,7 @@ class Parser {
         }
         // Check if the first token is a binary operator
         if (this.check_binary_operator()){
-            return new SyntaxError(this.token, "Expected literal")
+            return new SyntaxError(this.token, "Expected value")
         }
         // Check if there is a tagged variable assignment
         if (this.check_tag("const", "global")){
@@ -2090,7 +2111,7 @@ class Parser {
             }
             result.value = -result.value
         } else { // Two operators in a row
-            return new SyntaxError(self.token, "Expected literal")
+            return new SyntaxError(self.token, "Expected value")
         }
         while (self.check_tag('(', '[') || self.token instanceof Property){ // adding calls or properties
             result = self.calls_or_property(self, result) // updating
@@ -2112,6 +2133,7 @@ class Parser {
     expression(self){
         let result = self.parse_binary_operator(self, self.term, [Add, Minus])
         if (self.check_instance(IntegerType, FloatType, Identifier)){
+            console.log(self.token)
             return new SyntaxError(self.token, "Expected operator")
         }
         return result
@@ -2119,7 +2141,7 @@ class Parser {
 
     statement(self){
         if (this.check_binary_operator()){ // starts with binary operator
-            return new SyntaxError(self.token, "Expected literal")
+            return new SyntaxError(self.token, "Expected value")
         }
         let left = self.expression(self) //left hand side
         if (left instanceof Error || !(self.token instanceof ComparisonOperator)){ 
@@ -2131,7 +2153,7 @@ class Parser {
             return new SyntaxError(result, "Incomplete input")
         }
         if (this.check_binary_operator()){ // starts with binary operator
-            return new SyntaxError(self.token, "Expected literal")
+            return new SyntaxError(self.token, "Expected value")
         }
         let right = self.expression(self) //right hand side
         if (right instanceof Error){
