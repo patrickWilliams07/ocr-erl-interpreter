@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR ERL Interpreter</title>
+    <link rel="stylesheet" href="main.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
+</head>
+<body>
+    <div id = "frame">
+        <div id="title">OCR Exam Reference Language Interpeter</div>
+        <div id="pages">
+            <div class="page">About Project</div>
+            <div class="page">Documentation</div>
+            <div class="page">Code Examples</div>
+            <div class="page">Exam Questions</div>
+            <div class="page" id="report">Report Bug</div>
+        </div>
+
+        <!-- Execution -->
+        <textarea class = "text" id="input" placeholder="Enter your ERL code here:" autofocus></textarea>
+        <textarea class = "text" id="output" placeholder="Output of code will be displayed here:" readonly></textarea>
+        <button id="run" title="Execute ERL code">Run ➤</button>
+
+        <!-- Uploading ERL -->
+        <button class="rect" id="upload" title="Upload ERL or .txt file from computer">📤</button>
+        <input type="file" id="uploadFile" style="display:none" accept=".txt,.erlcode">
+
+        <!-- Downloading ERL -->
+        <button class="rect" id="download" title="Download current code as ERL file to save">📥</button>
+        <a download="myCode.erlcode" href="data:text/text;utf8," id="downloadFile" style="display:none">test</a>
+
+        <div id="files"></div>
+        <script src="src.js"></script>
+    </div>
+</body>
+</html>

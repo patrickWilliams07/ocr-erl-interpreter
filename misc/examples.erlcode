@@ -1,0 +1,67 @@
+// binary converter
+
+function stringToAscii(string)
+    array values[string.length]
+    for i = 0 to string.length -1
+        values[i] = ASC(string.substring(i, 1))
+    next i
+    return values
+endfunction
+
+function integerToBinary(number)
+    binary = ""
+    for i = 7 to 0 step -1
+        if number >= 2^i then
+            number = number - 2^i
+            binary = binary + "1"
+        else
+            binary = binary + "0"
+        endif
+    next i
+    return binary
+endfunction
+
+procedure stringToBinary(string)
+    output = ""
+    values = stringToAscii(string)
+    if values.length == 1 then
+        print(integerToBinary(values[0]))
+    else
+        for i = 0 to values.length - 2
+            output = output + integerToBinary(values[i]) + " "
+        next i
+        output = output + integerToBinary(values[values.length - 1])
+        print(output)
+    endif
+endprocedure
+
+print("Enter nothing at any point to stop")
+string = input("==> ")
+while string != ""
+    stringToBinary(string)
+    string = input("==> ")
+endwhile
+
+// irregular font
+
+function weirdText(string)
+    capital = False
+    newString = ""
+    for i = 0 to string.length - 1
+        letter = string.substring(i, 1)
+        if capital then
+            newString = newString + letter.upper
+        else
+            newString = newString + letter.lower
+        endif
+        capital = NOT capital
+    next i
+    return newString
+endfunction
+
+print("Enter nothing at any point to stop")
+string = input("==> ")
+while string != ""
+    print(weirdText(string))
+    string = input("==> ")
+endwhile

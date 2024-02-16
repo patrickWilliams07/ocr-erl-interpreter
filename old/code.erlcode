@@ -1,0 +1,5 @@
+file = open("download.png")
+while NOT file.endOfFile()
+    print(file.readLine())
+endwhile
+file.close()
