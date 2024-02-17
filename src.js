@@ -37,7 +37,6 @@ class SymbolTable {
     async get(token){
         for (let item of this.table){ // Checks if in current table
             if (item.name == token.name){
-                console.log(item.value)
                 return await item.value
             }
         }
@@ -828,14 +827,14 @@ class Print extends Subroutine {
             }
             output.push(result.display())
         }
-        $("#output").val($("#output").val() + output.join(' ') + '\n')
+        outputPrint(output.join(' '))
         // console.log(output.join(' ')) // ONLY PRINT STATEMENT
         return Subroutine.nullReturn
     }
 }
 
 class Input extends Subroutine {
-    static lastKey = null
+    static enterPressed = false
 
     display(){
         return "<native subroutine: input>"
@@ -856,12 +855,12 @@ class Input extends Subroutine {
             }
             message = result.display() // Outputs input message
         }
-        $("#output").val($("#output").val() + message) // displays message 
+        outputPrint(message, false) // displays message 
         let before = $("#output").val() // records contents of textarea before
-        Input.lastKey = null // resets last key in case previously enter was entered
+        Input.enterPressed = false // resets last key in case previously enter was entered
         $("#output").attr("readonly", false) // allows typinh
         $("#output").focus() // focuses cursor on window
-        while (Input.lastKey != 13) { // waits for enter key
+        while (!Input.enterPressed && Evaluator.active) { // waits for enter key
             let length = $("#output").val().length // current length of contents
             if (length < before.length){ // if something was deleted
                 $("#output").val(before) // revert
@@ -872,6 +871,10 @@ class Input extends Subroutine {
             await Input.wait() // wait
         }
         $("#output").attr("readonly", true) // no longer can type
+        if (!Evaluator.active){
+            outputPrint('', true) // newline for abort message
+            return new Abort()
+        }
         let after = $("#output").val() // value afterwards to get contents
         return new StringType(call.position, call.line, after.slice(before.length, -1))
     }
@@ -1592,7 +1595,7 @@ class LexicalError extends Error {
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nLexical Error: ${this.description}\n${this.location()}`
+        return ` 🚨 ERROR @line ${this.line}\nLexical Error: ${this.description}\n${this.location()}`
     }
 }
 
@@ -1604,7 +1607,7 @@ class SyntaxError extends Error {
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nInvalid Syntax: ${this.description}\n${this.location()}`
+        return ` 🚨 ERROR @line ${this.line}\nInvalid Syntax: ${this.description}\n${this.location()}`
     }
 }
 
@@ -1616,7 +1619,7 @@ class EvaluationError extends Error {
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nEvaluation Error: ${this.description}\n${this.location()}`
+        return ` 🚨 ERROR @line ${this.line}\nEvaluation Error: ${this.description}\n${this.location()}`
     }
 }
 
@@ -1628,7 +1631,7 @@ class IdentifierError extends Error{
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
+        return ` 🚨 ERROR @line ${this.line}\nIdentifier Error: '${this.token.name}' ${this.description}\n${this.location()}`
     }
 }
 
@@ -1640,7 +1643,17 @@ class TypeError extends Error{
     }
 
     display(){
-        return ` ! ERROR @line ${this.line}\nType Error: ${this.description}\n${this.location()}`
+        return ` 🚨 ERROR @line ${this.line}\nType Error: ${this.description}\n${this.location()}`
+    }
+}
+
+class Abort extends Error{
+    constructor(){
+        super(null, null)
+    }
+
+    display(){
+        return " 🚨 Program aborted by user"
     }
 }
 
@@ -2809,10 +2822,15 @@ class Evaluator {
             return condition
         }
         while (condition){
-            let result = await this.evaluate_many_asts(await loop.evaluate())
+            let contents = await loop.evaluate()
+            let result = await this.evaluate_many_asts(contents)
             if (result != null){
                 return result
             }
+            if (!Evaluator.active){
+                return new Abort()
+            }
+            await Evaluator.wait()
             condition = await loop.evaluate_condition()
             if (condition instanceof Error){
                 condition
@@ -2822,7 +2840,18 @@ class Evaluator {
         return null
     }
 
+    static wait(){
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve()
+            }, 0.01 // modify to change loop delay
+        )})      // in milliseconds
+    }
+
     async evaluate_single_ast(ast){
+        if (!Evaluator.active){
+            return new Abort()
+        }
         if (ast instanceof Return){
             return ast
         }
@@ -2925,7 +2954,7 @@ class Interpreter extends Evaluator{
         if (!this.have_tokens){
             let result = this.make_tokens()
             if (result instanceof Error){
-                $("#output").val($("#output").val() + `\n${result.display()}\nExited with failure`)
+                outputPrint(`${result.display()}\n\n ❌ Exited with failure`)
                 return 1
             }
         }
@@ -2934,12 +2963,12 @@ class Interpreter extends Evaluator{
         while (ast != null){
             let result = await this.evaluate_single_ast(ast)
             if (result instanceof Error){
-                $("#output").val($("#output").val() + `\n${result.display()}\nExited with failure`)
+                outputPrint(($("#output").val().length == 0 ? '' : '\n') + `${result.display()}\n\n ❌ Exited with failure`)
                 return 1
             }
             ast = parser.parse_next()
         }
-        $("#output").val($("#output").val() + `\nExited successfully`)
+        outputPrint($("#output").val().length == 0 ? " ✅ Exited successfully" : "\n ✅ Exited successfully")
         return 0
     }
 
@@ -2974,33 +3003,38 @@ class Interpreter extends Evaluator{
 let interpreter = new Interpreter
 
 $("#run").click( async () => {
-    if (Evaluator.active) {
-        return
+    if (Evaluator.active) { // checks if already running
+        Evaluator.active = false
+        $("#output").focus()
+    } else {
+        $("#output").val('') // reset output
+        $("#run").html("Stop 🛑") // change button text
+        $("#run").addClass("active") // keep button pushed down
+        $("#abort").show()
+        Evaluator.active = true // make active 
+        interpreter.set_plaintext_manually($("#input").val())
+        await interpreter.run() // wait for completion
     }
-    $("#output").val('')
-    $("#run").html("Run 🏃‍♂️")
-    $("#run").addClass("active")
-    Evaluator.active = true
-    interpreter.set_plaintext_manually($("#input").val())
-    await interpreter.run()
-    $("#run").removeClass("active")
-    $("#run").html("Run ➤")
-    Evaluator.active = false
+    $("#run").removeClass("active")  // reset
+    $("#run").html("Run ➤")          // to
+    Evaluator.active = false         // original
+    $("#abort").hide()
 })
 
-$("#output").on( "keypress", (event) => {
-    Input.lastKey = event.keyCode || event.which
+$("#output").on( "keydown", (event) => {
+    if (event.keyCode == 13 || event.which == 13){
+        Input.enterPressed = true
+    }
 })
 
 $("#input").on( "keydown", (event) => {
-    if (event.keyCode == 9 || event.keyCode == 9){
-        let start = $("#input").prop("selectionStart")
-        let end = $("#input").prop("selectionEnd")
-        console.log(start, end)
+    if (event.keyCode == 9 || event.which == 9){
+        let start = $("#input").prop("selectionStart") // cursor positions
+        let end = $("#input").prop("selectionEnd") // then adding tab in the middle
         $("#input").val($("#input").val().substring(0, start) + '\t' + $("#input").val().substring(end))
-        $("#input").prop("selectionStart", start + 1)
+        $("#input").prop("selectionStart", start + 1) // setting start and end to after tab
         $("#input").prop("selectionEnd", start + 1)
-        event.preventDefault()
+        event.preventDefault() // stops navigation
     }
 })
 
@@ -3018,13 +3052,16 @@ $("#uploadFile").change(() => {
 })
 
 $("#download").click( () => {
-    $("#downloadFile").attr("href","data:text/text;utf8," + $("#input").val())
-    if ($("#input").val().startsWith('//')){
+    $("#downloadFile").attr("href","data:text/text;utf8," + $("#input").val()) // set file contents to input
+    if ($("#input").val().startsWith('//')){ // if starts with comment, custom name
         $("#downloadFile").attr("download", $("#input").val().split('\n')[0].substring(3)  + ".erlcode")
-    } else {
+    } else { // otherwise default name
         $("#downloadFile").attr("download", "myCode.erlcode")
-    }
-    console.log($("#downloadFile").attr("href"),$("#downloadFile").attr("download"))
-    document.getElementById("downloadFile").click()
-    // $("#downloadFile").click() // why no work!?!?!?!?
+    } // click the anchor to trigger the download
+    $("#downloadFile")[0].click()
 })
+
+function outputPrint(message, newLine=true){
+    $("#output").val($("#output").val() + message + (newLine ? '\n' : ''))
+    $("#output").scrollTop($("#output")[0].scrollHeight)
+}

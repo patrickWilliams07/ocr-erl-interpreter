@@ -26,10 +26,14 @@ body {
 .page {
     padding-left: 1vw;
     font-size: 16px;
-    color: whitesmoke;
+    color: grey;
     text-decoration: underline;
     flex-grow: 1;
     align-self: center;
+}
+
+#report, #docs {
+    color: whitesmoke;
     cursor: pointer;
 }
 
@@ -96,9 +100,17 @@ button {
     margin-top: 3.5vh;
 }
 
-button:active, .active {
-    background-color: #1e5128;
-    box-shadow: 0 3px #142a10;
+.active {
+    background-color: rgb(108, 10, 10);
+    box-shadow: 0 5px rgb(54, 5, 5);
+
+}
+
+.active:hover {
+    background-color: rgb(142, 0, 0);
+}
+
+button:active {
     transform: translateY(2px);
 }
 
@@ -108,5 +120,10 @@ button:hover:not(.active) {
 
 #files {
     grid-area: 3 / 18 / 4 / 27;
-    outline: 1px dashed white;
+    /* outline: 1px dashed white; */
+}
+
+#version {
+    grid-area: 1 / 29 / 2 / 31;
+    color: whitesmoke;
 }
