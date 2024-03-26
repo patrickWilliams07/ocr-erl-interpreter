@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR ERL Syntax</title>
+    <link rel="stylesheet" href="./syntax-highlighting/codemirror.css">
+    <link rel="stylesheet" href="./syntax-highlighting/monokai.css">
+    <script src="./syntax-highlighting/codemirror.js"></script>
+    <script src="./syntax-highlighting/simpleMode.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.js" integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4=" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            color: whitesmoke;
+            background-color: #0F0F0F;
+            font-family: monospace;
+        }
+
+        h1 {
+            font-size: 40px;
+            text-align: center;
+            font-weight: 100;
+        }
+        a {
+            font-size: 18px;
+            color: whitesmoke;
+            cursor: pointer;
+            text-decoration: underline;
+            align-self: center;
+        }
+    </style>
+</head>
+<body>
+    <a class="page" href="./index.html">Return To Interpreter</a>
+    <h1>Exam Reference Language Examples</h1>
+    <div style="width: 80vw; margin: auto;">
+        <textarea id="example">
+// These are some examples of code written in Exam Reference Language
+// Feel free to select some code and copy it into the interpreter to test it
+// This document is editable so you can make changes to make your own algorithms
+
+// STRING REVERSE
+
+function reverseString(string)
+    newString = ""                                      // initialise empty string
+    for i = string.length - 1 to 0 step -1              // iterates from last character to first character
+        newString = newString + string.substring(i, 1)  // adds character at that position
+    next i
+    return newString   // return value
+endfunction
+
+print(reverseString( "Hello World!" ))    // example
+
+// MATHS QUIZ
+
+questions = int(input("Enter the number of questions: "))
+for i = 0 to questions - 1
+    firstNumber = random(1, 30)
+    secondNumber = random(1, 30)
+    if i MOD 2 == 0 then
+        answer = firstNumber + secondNumber
+        operator = '+'
+    else
+        answer = firstNumber - secondNumber
+        operator = '-'
+    endif
+    do
+        print("What is", firstNumber, operator, secondNumber, "?")
+        value = input("==> ")
+    until value == str(answer)
+    print("Correct!")
+next i
+
+// LINEAR SEARCH
+
+function linearSearch(myArray, target)
+    for i = 0 to myArray.length - 1
+        if myArray[i] == target then
+            return True
+        endif
+    next i
+    return False
+endfunction
+
+array test = [6, 2, 7, 9, 1, 3, 5]
+print(linearSearch(myArray, 3))
+
+// BUBBLE SORT
+
+procedure bubbleSort(arr)
+    for i = 0 to arr.length - 2
+        for j = 0 to arr.length - i - 2
+            if arr[j] > arr[j + 1] then
+                temp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = temp
+            endif
+        next j
+    next i
+endfunction
+
+array test = [6, 2, 7, 9, 1, 3, 5]
+bubbleSort(test)
+print(test)
+
+// 
+
+        </textarea>
+    </div>
+    <script>
+        $( () => {
+            CodeMirror.defineSimpleMode("erlcode", {
+                start: [
+                    {regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string"},
+                    {regex: /'(?:[^\\]|\\.)*?(?:'|$)/, token: "string"},
+                    {regex: /endswitc/, token:"keyword", dedent: true, next: "endswitch"},
+                    {regex: /(?:for|while|do|if|switch|case|procedure|function)\b/, token: "keyword", indent: true},
+                    {regex: /(?:next|endwhile|until|endif|endswitch|endprocedure|endfunction)\b/, token: "keyword", dedent: true},
+                    {regex: /(?:const|global|to|next|step|then|elseif|else|default|array|return)\b/ ,token: "keyword"},
+                    {regex: /(?:input|print|str|int|float|real|bool|ASC|CHR|open|newFile|random)\b/, token: "native"},
+                    {regex: /True|False/, token: "boolean"},
+                    {regex: /0x[a-f\d]+|[-+]?(?:\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/i, token: "number"},
+                    {regex: /\/\/.*/, token: "visible-comment"},
+                    {regex: /[-+\/\^*=<>]|!=|MOD|DIV|AND|OR|NOT/, token: "operator"},
+                    {regex: /([a-zA-Z_]\w*)(\.)([a-zA-Z_]\w*)/, token: ["variable", null, "property"]},
+                    {regex: /[a-zA-Z_]\w*/, token: "variable"},
+                ],
+                endswitch: [ // for double dedent
+                    {regex: /h/, token:"keyword", dedent: true, next: "start"},
+                    {regex: /(.|\n)*?/, next:"start"}
+                ],
+                meta: {
+                lineComment: "//",
+                }
+            });
+            
+            CodeMirror.fromTextArea($("#example")[0], {
+                lineNumbers : true,
+                theme: "monokai",
+                mode: "erlcode",
+                indentUnit: 4,
+                indentWithTabs: true
+            })
+        })
+    </script>
+</body>
+</html>
